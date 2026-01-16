@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import NextAuthProvider from "@/components/providers/session-provider";
 
 export const metadata: Metadata = {
   title: "Property Management System",
@@ -13,7 +14,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <NextAuthProvider>{children}</NextAuthProvider>
+      </body>
     </html>
   );
 }

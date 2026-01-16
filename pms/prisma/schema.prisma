@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model accounts {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  users             users   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model alerts {
+  id               String            @id @default(cuid())
+  severity         String
+  message          String
+  isRead           Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  propertyId       String
+  eventId          String?
+  userId           String
+  ambiguity_events ambiguity_events? @relation(fields: [eventId], references: [id])
+  properties       properties        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  users            users             @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ambiguity_events {
+  id             String     @id @default(cuid())
+  eventTimestamp DateTime   @default(now())
+  personCount    Int?
+  ambiguityScore Float
+  videoClipUrl   String?
+  description    String?
+  resolved       Boolean    @default(false)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  propertyId     String
+  detectedBy     String?
+  alerts         alerts[]
+  users          users?     @relation(fields: [detectedBy], references: [id])
+  properties     properties @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+}
+
+model guests {
+  id          String        @id @default(cuid())
+  name        String
+  email       String?
+  phone       String
+  idProof     String?
+  address     String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  occupancies occupancies[]
+}
+
+model occupancies {
+  id                String    @id @default(cuid())
+  checkInTime       DateTime  @default(now())
+  expectedCheckOut  DateTime
+  actualCheckOut    DateTime?
+  numberOfOccupants Int
+  totalAmount       Float?
+  isPaid            Boolean   @default(false)
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  roomId            String
+  guestId           String
+  checkedInBy       String
+  users             users     @relation(fields: [checkedInBy], references: [id])
+  guests            guests    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  rooms             rooms     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+}
+
+model properties {
+  id                                     String             @id @default(cuid())
+  name                                   String             @unique
+  address                                String
+  numberOfFloors                         Int
+  totalRooms                             Int
+  status                                 PropertyStatus     @default(ACTIVE)
+  createdAt                              DateTime           @default(now())
+  updatedAt                              DateTime           @updatedAt
+  ownerId                                String
+  receptionistId                         String?            @unique
+  alerts                                 alerts[]
+  ambiguity_events                       ambiguity_events[]
+  users_properties_ownerIdTousers        users              @relation("properties_ownerIdTousers", fields: [ownerId], references: [id], onDelete: Cascade)
+  users_properties_receptionistIdTousers users?             @relation("properties_receptionistIdTousers", fields: [receptionistId], references: [id])
+  rooms                                  rooms[]
+}
+
+model rooms {
+  id            String        @id @default(cuid())
+  roomNumber    String
+  roomType      String
+  capacity      Int
+  pricePerNight Float
+  status        RoomStatus    @default(VACANT)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  propertyId    String
+  occupancies   occupancies[]
+  properties    properties    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, roomNumber])
+}
+
+model sessions {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  users        users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model users {
+  id                                          String             @id @default(cuid())
+  name                                        String?
+  email                                       String             @unique
+  emailVerified                               DateTime?
+  image                                       String?
+  password                                    String?
+  role                                        Role               @default(RECEPTIONIST)
+  isActive                                    Boolean            @default(true)
+  createdAt                                   DateTime           @default(now())
+  updatedAt                                   DateTime           @updatedAt
+  accounts                                    accounts[]
+  alerts                                      alerts[]
+  ambiguity_events                            ambiguity_events[]
+  occupancies                                 occupancies[]
+  properties_properties_ownerIdTousers        properties[]       @relation("properties_ownerIdTousers")
+  properties_properties_receptionistIdTousers properties?        @relation("properties_receptionistIdTousers")
+  sessions                                    sessions[]
+}
+
+model verification_tokens {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+enum PropertyStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  RECEPTIONIST
+}
+
+enum RoomStatus {
+  VACANT
+  OCCUPIED
+  MAINTENANCE
+}
