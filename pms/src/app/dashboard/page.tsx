@@ -12,8 +12,8 @@ export default async function DashboardPage() {
   const userRole = (session.user as any)?.role;
   const needsRoleSelection = (session.user as any)?.needsRoleSelection;
 
-  // Check if user needs to select role (new OAuth users)
-  if (needsRoleSelection) {
+  // Check if user needs to select role (role is null or needsRoleSelection flag is set)
+  if (needsRoleSelection || !userRole) {
     redirect("/auth/select-role");
   }
 
@@ -26,6 +26,6 @@ export default async function DashboardPage() {
     redirect("/dashboard/admin");
   }
 
-  // Default redirect if role is not set
+  // Fallback - should not reach here
   redirect("/auth/select-role");
 }

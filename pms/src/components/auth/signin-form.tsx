@@ -29,8 +29,8 @@ export function SignInForm() {
       if (result?.error) {
         setError("Invalid email or password");
       } else if (result?.ok) {
-        // Redirect to homepage, which will route to appropriate dashboard
-        router.push("/");
+        // Redirect to dashboard, which will check role and redirect accordingly
+        router.push("/dashboard");
         router.refresh();
       }
     } catch (error) {

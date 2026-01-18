@@ -51,7 +51,7 @@ export const authOptions: AuthOptions = {
             id: user.id,
             email: user.email,
             name: user.name,
-            role: user.role,
+            role: user.role, // Will be null for new users
           };
         } catch (error) {
           throw new Error("Invalid email or password");
@@ -120,7 +120,7 @@ export const authOptions: AuthOptions = {
                 email,
                 name: user.name || (profile as any)?.name || null,
                 image: user.image || (profile as any)?.picture || (profile as any)?.avatar_url || null,
-                role: "RECEPTIONIST", // Default, will be changed in role selection
+                // role is intentionally not set - user will select it
               },
             });
 
@@ -142,8 +142,7 @@ export const authOptions: AuthOptions = {
             });
 
             user.id = newUser.id;
-            (user as any).role = newUser.role;
-            (user as any).needsRoleSelection = true; // Mark for role selection
+            (user as any).role = newUser.role; // Will be null, triggering role selection
           }
         } catch (error) {
           console.error("Error in signIn callback:", error);
@@ -155,8 +154,8 @@ export const authOptions: AuthOptions = {
     async jwt({ token, user, account, trigger, session }) {
       // Initial sign in - store role in token
       if (user) {
-        token.role = (user as any).role || "RECEPTIONIST";
-        token.needsRoleSelection = (user as any).needsRoleSelection || false;
+        token.role = (user as any).role;
+        token.needsRoleSelection = !(user as any).role; // If no role, needs selection
         token.id = user.id;
       }
       
@@ -167,19 +166,21 @@ export const authOptions: AuthOptions = {
         return token;
       }
       
-      // Only fetch fresh data if explicitly updating or if role is missing
-      if (trigger === "update" || !token.role) {
-        if (token.email) {
-          const dbUser = await prisma.users.findUnique({
-            where: { email: token.email },
-            select: { role: true, id: true },
-          });
-          
-          if (dbUser) {
-            token.role = dbUser.role;
-            token.id = dbUser.id;
-          }
+      // Always validate user still exists in database
+      if (token.email) {
+        const dbUser = await prisma.users.findUnique({
+          where: { email: token.email as string },
+          select: { role: true, id: true },
+        });
+        
+        // If user was deleted from DB, invalidate token
+        if (!dbUser) {
+          return null as any; // This will sign out the user
         }
+        
+        // Update token with fresh data
+        token.role = dbUser.role;
+        token.id = dbUser.id;
       }
       
       if (account?.provider) {
