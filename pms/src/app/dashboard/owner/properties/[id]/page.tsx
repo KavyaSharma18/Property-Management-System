@@ -1,35 +1,31 @@
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+"use client";
+
+import { use, useState } from "react";
 import DashboardHeader from "@/components/dashboard/header";
 import Sidebar from "@/components/dashboard/sidebar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
+import ManageReceptionistModal from "@/components/owner/manage-receptionist-modal";
 
 interface Props {
   params: Promise<{ id: string }>;
 }
 
-export default async function PropertyDetail({ params }: Props) {
-  const { id } = await params;
+export default function PropertyDetail({ params }: Props) {
+  //  Unwrap the params Promise using React.use()
+  const { id } = use(params);
+  
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [property, setProperty] = useState<any>(null);
 
-    const session = await getServerSession(authOptions);
+  //   const session = await getServerSession(authOptions);
 
-  if (!session) redirect("/auth/signin");
+  // if (!session) redirect("/auth/signin");
 
-//   // TEMP demo session for frontend phase
-//   const session =
-//     process.env.NODE_ENV === "development"
-//       ? {
-//           user: { name: "Demo Owner", email: "owner@demo.com", role: "OWNER" },
-//         }
-//       : await getServerSession(authOptions);
-
-//   if (!session) redirect("/auth/signin");
-
-  if ((session.user as any).role !== "OWNER") {
-    redirect("/dashboard/receptionist");
-  }
+  // TEMP demo session for frontend phase
+  const session = {
+    user: { name: "Demo Owner", email: "owner@demo.com", role: "OWNER" },
+  };
 
   // 🔹 Demo property + metrics data (later comes from backend)
   const demoProperties: Record<string, any> = {
@@ -95,9 +91,23 @@ export default async function PropertyDetail({ params }: Props) {
     },
   };
 
-  const property = demoProperties[id];
+  const currentProperty = property || demoProperties[id];
 
-  if (!property) {
+  const handleAssignReceptionist = (receptionistId: string, receptionistName: string) => {
+    setProperty({
+      ...currentProperty,
+      receptionist: { id: receptionistId, name: receptionistName },
+    });
+  };
+
+  const handleRemoveReceptionist = () => {
+    setProperty({
+      ...currentProperty,
+      receptionist: null,
+    });
+  };
+
+  if (!currentProperty) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-8">
         <div className="max-w-3xl mx-auto">
@@ -126,14 +136,14 @@ export default async function PropertyDetail({ params }: Props) {
           {/* Property Info */}
           <Card className="mb-8">
             <CardContent>
-              <h1 className="text-3xl font-bold mb-1">{property.name}</h1>
-              <p className="text-muted-foreground">{property.address}</p>
-              <p className="mt-4">{property.description}</p>
+              <h1 className="text-3xl font-bold mb-1">{currentProperty.name}</h1>
+              <p className="text-muted-foreground">{currentProperty.address}</p>
+              <p className="mt-4">{currentProperty.description}</p>
 
               <div className="mt-4">
                 <p className="text-sm text-muted-foreground">Receptionist</p>
-                {property.receptionist ? (
-                  <p className="font-medium">{property.receptionist.name} ({property.receptionist.id})</p>
+                {currentProperty.receptionist ? (
+                  <p className="font-medium">{currentProperty.receptionist.name} ({currentProperty.receptionist.id})</p>
                 ) : (
                   <p className="font-medium text-muted-foreground">Not assigned</p>
                 )}
@@ -143,21 +153,31 @@ export default async function PropertyDetail({ params }: Props) {
 
           {/* Property Metrics */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <MetricCard label="Total Revenue" value={`₹${property.totalRevenue.toLocaleString()}`} />
-            <MetricCard label="Visitors Today" value={property.visitorsToday} />
-            <MetricCard label="Guests Staying" value={property.guestsStaying} />
-            <MetricCard label="Occupancy Rate" value={`${property.occupancyRate}%`} />
-            <MetricCard label="Total Rooms" value={property.totalRooms} />
-            <MetricCard label="Alerts / Flags" value={property.alerts} highlight={property.alerts > 0} />
+            <MetricCard label="Total Revenue" value={`₹${currentProperty.totalRevenue.toLocaleString("en-IN")}`} />
+            <MetricCard label="Visitors Today" value={currentProperty.visitorsToday} />
+            <MetricCard label="Guests Staying" value={currentProperty.guestsStaying} />
+            <MetricCard label="Occupancy Rate" value={`${currentProperty.occupancyRate}%`} />
+            <MetricCard label="Total Rooms" value={currentProperty.totalRooms} />
+            <MetricCard label="Alerts / Flags" value={currentProperty.alerts} highlight={currentProperty.alerts > 0} />
           </div>
 
           {/* Actions */}
           <Card className="mt-8">
             <CardContent>
               <h2 className="text-xl font-semibold mb-4">Property Actions</h2>
-              <Button variant="outline">Assign / Manage Receptionist</Button>
+              <Button onClick={() => setIsModalOpen(true)}>Manage Receptionist</Button>
             </CardContent>
           </Card>
+
+          {/* Modal */}
+          <ManageReceptionistModal 
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            currentReceptionist={currentProperty.receptionist}
+            propertyName={currentProperty.name}
+            onAssignSuccess={handleAssignReceptionist}
+            onRemoveSuccess={handleRemoveReceptionist}
+          />
         </main>
       </div>
     </div>

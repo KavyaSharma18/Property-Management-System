@@ -64,7 +64,7 @@ export default async function OwnerDashboard() {
             <Card>
               <CardContent>
                 <h3 className="text-sm font-medium text-muted-foreground">Total Revenue Generated</h3>
-                <p className="text-3xl font-bold mt-2">₹{dashboardStats.totalRevenue.toLocaleString()}</p>
+                <p className="text-3xl font-bold mt-2">₹{dashboardStats.totalRevenue.toLocaleString("en-IN")}</p>
               </CardContent>
             </Card>
 
