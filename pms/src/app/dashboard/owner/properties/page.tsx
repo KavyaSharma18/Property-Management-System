@@ -12,18 +12,18 @@ export default async function OwnerPropertiesPage() {
 
   if (!session) redirect("/auth/signin");
 
-//     const session =
-//   process.env.NODE_ENV === "development"
-//     ? {
-//         user: {
-//           name: "Demo Owner",
-//           email: "owner@demo.com",
-//           role: "OWNER",
-//         },
-//       }
-//     : await getServerSession(authOptions);
+  //   const session =
+  // process.env.NODE_ENV === "development"
+  //   ? {
+  //       user: {
+  //         name: "Demo Owner",
+  //         email: "owner@demo.com",
+  //         role: "OWNER",
+  //       },
+  //     }
+  //   : await getServerSession(authOptions);
 
-//     if (!session) redirect("/auth/signin");
+  //   if (!session) redirect("/auth/signin");
 
 
   if ((session.user as any).role !== "OWNER") {

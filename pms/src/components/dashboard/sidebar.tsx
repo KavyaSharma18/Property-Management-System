@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Bell, Home, Building, User } from "lucide-react";
 
 type Role = "owner" | "receptionist";
 
@@ -30,11 +31,13 @@ export default function Sidebar({ role }: SidebarProps) {
 				<nav className="flex flex-col gap-2">
 					<Button asChild size="default" variant={isExact(base) ? "default" : "ghost"} className="justify-start">
 						<Link href={base} className={isExact(base) ? "font-semibold" : ""}>
+							<Home size={18} className="mr-2" />
 							Dashboard
 						</Link>
 					</Button>
 
 					{role === "owner" && (
+					<>
 						<Button
 							asChild
 							size="default"
@@ -42,13 +45,26 @@ export default function Sidebar({ role }: SidebarProps) {
 							className="justify-start"
 						>
 							<Link href={`${base}/properties`} className={isSectionActive(`${base}/properties`) ? "font-semibold" : ""}>
+								<Building size={18} className="mr-2" />
 								Properties
 							</Link>
 						</Button>
-					)}
 
+						<Button
+							asChild
+							size="default"
+							variant={isExact(`${base}/alerts`) ? "default" : "ghost"}
+							className="justify-start"
+						>
+							<Link href={`${base}/alerts`} className={isExact(`${base}/alerts`) ? "font-semibold" : ""}>
+								<Bell size={18} className="mr-2" />
+								Alerts
+							</Link>
+						</Button>
+					</>				)}
 					<Button asChild size="default" variant={isSectionActive("/profile") ? "default" : "ghost"} className="justify-start">
 						<Link href="/profile" className={isSectionActive("/profile") ? "font-semibold" : ""}>
+							<User size={18} className="mr-2" />
 							Profile
 						</Link>
 					</Button>
