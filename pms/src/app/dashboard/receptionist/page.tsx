@@ -147,8 +147,8 @@ export default async function ReceptionistDashboard() {
               </div>
             </CardContent>
           </Card>
-        </div> {/* ✅ closes flex-1 */}
-      </div> {/* ✅ closes flex */}
-    </div> /* ✅ closes min-h-screen */
+        </div> {/* closes flex-1 */}
+      </div> {/*closes flex */}
+    </div> /* closes min-h-screen */
   );
 }
