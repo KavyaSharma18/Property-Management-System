@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
+import { sendVerificationEmail } from "@/lib/email";
 
 export async function POST(request: Request) {
   try {
@@ -36,25 +38,50 @@ export async function POST(request: Request) {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // Create new user without role - will be set after role selection
-    const newUser = await prisma.users.create({
+    // Generate verification token
+    const token = crypto.randomBytes(32).toString("hex");
+    const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    // Store pending registration data with token
+    // User will only be created in DB after email verification
+    const pendingData = JSON.stringify({
+      name,
+      email,
+      password: hashedPassword,
+    });
+
+    await prisma.verification_tokens.create({
       data: {
-        name,
-        email,
-        password: hashedPassword,
-        // role is intentionally not set - user will select it
+        identifier: `PENDING_REG:${email}`,
+        token,
+        expires,
       },
     });
+
+    // Store the registration data using token as identifier
+    await prisma.verification_tokens.create({
+      data: {
+        identifier: `PENDING_DATA:${token}`,
+        token: pendingData,
+        expires,
+      },
+    });
+
+    // Send verification email
+    const emailResult = await sendVerificationEmail(email, token);
+
+    if (!emailResult.success) {
+      console.error("Failed to send verification email:", emailResult.error);
+      return NextResponse.json(
+        { error: "Failed to send verification email. Please try again." },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json(
       {
         success: true,
-        user: {
-          id: newUser.id,
-          name: newUser.name,
-          email: newUser.email,
-          role: newUser.role,
-        },
+        message: "Registration successful! Please check your email to verify your account and complete registration.",
       },
       { status: 201 }
     );

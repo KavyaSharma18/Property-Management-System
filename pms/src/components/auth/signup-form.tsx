@@ -33,7 +33,7 @@ export function SignUpForm() {
     setIsLoading(true);
 
     try {
-      // First, create the user account
+      // Create the user account (stored temporarily until email verified)
       const registerResponse = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -48,19 +48,9 @@ export function SignUpForm() {
         return;
       }
 
-      // Then, automatically sign them in
-      const result = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        setError("Account created but failed to sign in. Please try signing in.");
-      } else if (result?.ok) {
-        router.push("/auth/select-role");
-        router.refresh();
-      }
+      // Show success message - user needs to verify email before signing in
+      // Redirect to success page with email parameter
+      router.push(`/auth/registration-success?email=${encodeURIComponent(email)}`);
     } catch (error) {
       setError("An error occurred. Please try again.");
     } finally {

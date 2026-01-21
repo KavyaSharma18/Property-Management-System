@@ -27,7 +27,12 @@ export function SignInForm() {
       });
 
       if (result?.error) {
-        setError("Invalid email or password");
+        // Check if it's an email verification error
+        if (result.error.includes("verify your email")) {
+          setError(result.error);
+        } else {
+          setError("Invalid email or password");
+        }
       } else if (result?.ok) {
         // Redirect to dashboard, which will check role and redirect accordingly
         router.push("/dashboard");
@@ -69,8 +74,18 @@ export function SignInForm() {
       </div>
 
       {error && (
-        <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
-          {error}
+        <div className="space-y-2">
+          <div className="text-sm text-destructive bg-destructive/10 p-3 rounded-md">
+            {error}
+          </div>
+          {error.includes("verify your email") && (
+            <a
+              href="/auth/resend-verification"
+              className="text-sm text-primary hover:underline block text-center"
+            >
+              Resend verification email
+            </a>
+          )}
         </div>
       )}
 

@@ -120,6 +120,7 @@ export const authOptions: AuthOptions = {
                 email,
                 name: user.name || (profile as any)?.name || null,
                 image: user.image || (profile as any)?.picture || (profile as any)?.avatar_url || null,
+                emailVerified: new Date(), // OAuth accounts are pre-verified
                 // role is intentionally not set - user will select it
               },
             });
