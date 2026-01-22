@@ -32,8 +32,25 @@ export async function GET(
             createdAt: true,
           },
         },
+        floors: {
+          include: {
+            _count: {
+              select: {
+                rooms: true,
+              },
+            },
+          },
+          orderBy: { floorNumber: 'asc' },
+        },
         rooms: {
           include: {
+            floors: {
+              select: {
+                id: true,
+                floorNumber: true,
+                floorName: true,
+              },
+            },
             occupancies: {
               where: {
                 actualCheckOut: null, // Current occupancies only
@@ -155,7 +172,20 @@ export async function PUT(
     const ownerId = (session.user as any)?.id;
     const propertyId = params.id;
     const body = await request.json();
-    const { name, address, numberOfFloors, totalRooms, status } = body;
+    const { 
+      name, 
+      address, 
+      city,
+      state,
+      zipCode,
+      country,
+      description,
+      amenities,
+      images,
+      numberOfFloors, 
+      totalRooms, 
+      status 
+    } = body;
 
     // Check if property belongs to owner
     const property = await prisma.properties.findFirst({
@@ -188,12 +218,35 @@ export async function PUT(
       }
     }
 
+    // Validate numberOfFloors if being updated
+    if (numberOfFloors) {
+      const currentFloorsCount = await prisma.floors.count({
+        where: { propertyId },
+      });
+
+      if (parseInt(numberOfFloors) < currentFloorsCount) {
+        return NextResponse.json(
+          {
+            error: `Cannot set number of floors to ${numberOfFloors}. Property already has ${currentFloorsCount} floors created. Delete floors first.`,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // Update property
     const updatedProperty = await prisma.properties.update({
       where: { id: propertyId },
       data: {
         ...(name && { name }),
         ...(address && { address }),
+        ...(city && { city }),
+        ...(state && { state }),
+        ...(zipCode && { zipCode }),
+        ...(country && { country }),
+        ...(description && { description }),
+        ...(amenities && { amenities: JSON.stringify(amenities) }),
+        ...(images && { images: JSON.stringify(images) }),
         ...(numberOfFloors && { numberOfFloors: parseInt(numberOfFloors) }),
         ...(totalRooms && { totalRooms: parseInt(totalRooms) }),
         ...(status && { status }),
@@ -205,6 +258,9 @@ export async function PUT(
             name: true,
             email: true,
           },
+        },
+        floors: {
+          orderBy: { floorNumber: 'asc' },
         },
       },
     });

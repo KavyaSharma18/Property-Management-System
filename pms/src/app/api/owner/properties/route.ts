@@ -24,6 +24,14 @@ export async function GET(request: Request) {
             email: true,
           },
         },
+        floors: {
+          select: {
+            id: true,
+            floorNumber: true,
+            floorName: true,
+          },
+          orderBy: { floorNumber: 'asc' },
+        },
         _count: {
           select: {
             rooms: true, // Count of actual rooms created
@@ -66,12 +74,25 @@ export async function POST(request: Request) {
 
     const ownerId = (session.user as any)?.id;
     const body = await request.json();
-    const { name, address, numberOfFloors, totalRooms } = body;
+    const { 
+      name, 
+      address, 
+      city,
+      state,
+      zipCode,
+      country,
+      description,
+      amenities,
+      images,
+      numberOfFloors, 
+      totalRooms,
+      floors: floorsData
+    } = body;
 
     // Validation
     if (!name || !address || !numberOfFloors || !totalRooms) {
       return NextResponse.json(
-        { error: "All fields are required" },
+        { error: "Name, address, number of floors, and total rooms are required" },
         { status: 400 }
       );
     }
@@ -98,17 +119,150 @@ export async function POST(request: Request) {
       );
     }
 
-    // Create property
+    // Validate room counts if rooms are provided
+    if (floorsData && Array.isArray(floorsData)) {
+      const totalRoomsInFloors = floorsData.reduce((total: number, floor: any) => {
+        return total + (floor.rooms ? floor.rooms.length : 0);
+      }, 0);
+
+      if (totalRoomsInFloors > parseInt(totalRooms)) {
+        return NextResponse.json(
+          { 
+            error: `Total rooms in floors (${totalRoomsInFloors}) cannot exceed property capacity (${totalRooms})` 
+          },
+          { status: 400 }
+        );
+      }
+
+      // Validate room numbers are unique across all floors
+      const allRoomNumbers = floorsData.flatMap((floor: any) => 
+        floor.rooms ? floor.rooms.map((room: any) => room.roomNumber) : []
+      );
+      const duplicateRooms = allRoomNumbers.filter(
+        (num: string, index: number) => allRoomNumbers.indexOf(num) !== index
+      );
+      if (duplicateRooms.length > 0) {
+        return NextResponse.json(
+          { error: `Duplicate room numbers found: ${duplicateRooms.join(', ')}` },
+          { status: 400 }
+        );
+      }
+
+      // Validate room types and categories
+      const validRoomTypes = ['SINGLE', 'DOUBLE', 'TRIPLE', 'QUAD', 'SUITE', 'DELUXE', 'DORMITORY', 'STUDIO'];
+      const validRoomCategories = ['ECONOMY', 'MODERATE', 'PREMIUM', 'ELITE', 'VIP'];
+      
+      for (const floor of floorsData) {
+        if (floor.rooms && Array.isArray(floor.rooms)) {
+          for (const room of floor.rooms) {
+            if (!room.roomNumber || !room.roomType || !room.capacity || !room.pricePerNight) {
+              return NextResponse.json(
+                { error: 'Each room must have roomNumber, roomType, capacity, and pricePerNight' },
+                { status: 400 }
+              );
+            }
+            if (!validRoomTypes.includes(room.roomType)) {
+              return NextResponse.json(
+                { error: `Invalid room type: ${room.roomType}. Valid types: ${validRoomTypes.join(', ')}` },
+                { status: 400 }
+              );
+            }
+            if (room.roomCategory && !validRoomCategories.includes(room.roomCategory)) {
+              return NextResponse.json(
+                { error: `Invalid room category: ${room.roomCategory}. Valid categories: ${validRoomCategories.join(', ')}` },
+                { status: 400 }
+              );
+            }
+          }
+        }
+      }
+    }
+
+    // Create property with floors and rooms
     const property = await prisma.properties.create({
       data: {
         name,
         address,
+        city,
+        state,
+        zipCode,
+        country: country || "India",
+        description,
+        amenities: amenities ? JSON.stringify(amenities) : null,
+        images: images ? JSON.stringify(images) : null,
         numberOfFloors: parseInt(numberOfFloors),
         totalRooms: parseInt(totalRooms),
         ownerId,
         status: "ACTIVE",
+        floors: {
+          create: floorsData && Array.isArray(floorsData) && floorsData.length > 0
+            ? floorsData.map((floor: any) => ({
+                floorNumber: floor.floorNumber,
+                floorName: floor.floorName || (floor.floorNumber === 0 ? "Ground Floor" : `Floor ${floor.floorNumber}`),
+                description: floor.description,
+              }))
+            : Array.from({ length: parseInt(numberOfFloors) }, (_, i) => ({
+                floorNumber: i,
+                floorName: i === 0 ? "Ground Floor" : `Floor ${i}`,
+              })),
+        },
       },
       include: {
+        floors: {
+          include: {
+            rooms: true,
+          },
+          orderBy: { floorNumber: 'asc' },
+        },
+        _count: {
+          select: {
+            rooms: true,
+          },
+        },
+      },
+    });
+
+    // If rooms were provided, create them separately after property and floors are created
+    if (floorsData && Array.isArray(floorsData)) {
+      for (const floorData of floorsData) {
+        if (floorData.rooms && Array.isArray(floorData.rooms) && floorData.rooms.length > 0) {
+          // Find the created floor by floor number
+          const createdFloor = property.floors.find(
+            (f) => f.floorNumber === floorData.floorNumber
+          );
+          
+          if (createdFloor) {
+            await prisma.rooms.createMany({
+              data: floorData.rooms.map((room: any) => ({
+                propertyId: property.id,
+                floorId: createdFloor.id,
+                roomNumber: room.roomNumber,
+                roomType: room.roomType,
+                roomCategory: room.roomCategory || "MODERATE",
+                capacity: parseInt(room.capacity),
+                pricePerNight: parseFloat(room.pricePerNight),
+                description: room.description,
+                amenities: room.amenities ? JSON.stringify(room.amenities) : null,
+                images: room.images ? JSON.stringify(room.images) : null,
+                size: room.size ? parseFloat(room.size) : null,
+                status: "VACANT",
+              })),
+            });
+          }
+        }
+      }
+    }
+
+    // Fetch the complete property with rooms
+    const completeProperty = await prisma.properties.findUnique({
+      where: { id: property.id },
+      include: {
+        floors: {
+          include: {
+            rooms: true,
+          },
+          orderBy: { floorNumber: 'asc' },
+        },
         _count: {
           select: {
             rooms: true,
@@ -118,7 +272,12 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(
-      { property, message: "Property created successfully" },
+      { 
+        property: completeProperty, 
+        message: "Property created successfully",
+        roomsCreated: completeProperty?._count.rooms || 0,
+        roomsRemaining: (completeProperty?.totalRooms || 0) - (completeProperty?._count.rooms || 0),
+      },
       { status: 201 }
     );
   } catch (error) {

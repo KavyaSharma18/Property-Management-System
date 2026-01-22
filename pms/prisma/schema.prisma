@@ -91,6 +91,13 @@ model properties {
   id                                     String             @id @default(cuid())
   name                                   String             @unique
   address                                String
+  city                                   String?
+  state                                  String?
+  zipCode                                String?
+  country                                String?            @default("India")
+  description                            String?
+  amenities                              String?            // JSON string of amenities
+  images                                 String?            // JSON array of image URLs
   numberOfFloors                         Int
   totalRooms                             Int
   status                                 PropertyStatus     @default(ACTIVE)
@@ -100,21 +107,43 @@ model properties {
   receptionistId                         String?            @unique
   alerts                                 alerts[]
   ambiguity_events                       ambiguity_events[]
+  floors                                 floors[]
   users_properties_ownerIdTousers        users              @relation("properties_ownerIdTousers", fields: [ownerId], references: [id], onDelete: Cascade)
   users_properties_receptionistIdTousers users?             @relation("properties_receptionistIdTousers", fields: [receptionistId], references: [id])
   rooms                                  rooms[]
 }
 
+model floors {
+  id          String     @id @default(cuid())
+  floorNumber Int
+  floorName   String?    // e.g., "Ground Floor", "First Floor"
+  description String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  propertyId  String
+  properties  properties @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  rooms       rooms[]
+
+  @@unique([propertyId, floorNumber])
+}
+
 model rooms {
   id            String        @id @default(cuid())
   roomNumber    String
-  roomType      String
+  roomType      RoomType
+  roomCategory  RoomCategory  @default(MODERATE)
   capacity      Int
   pricePerNight Float
+  description   String?
+  amenities     String?       // JSON string of room-specific amenities
+  images        String?       // JSON array of room image URLs
+  size          Float?        // Room size in square feet/meters
   status        RoomStatus    @default(VACANT)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   propertyId    String
+  floorId       String
+  floors        floors        @relation(fields: [floorId], references: [id], onDelete: Cascade)
   occupancies   occupancies[]
   properties    properties    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
@@ -172,4 +201,24 @@ enum RoomStatus {
   VACANT
   OCCUPIED
   MAINTENANCE
+  RESERVED
+}
+
+enum RoomType {
+  SINGLE
+  DOUBLE
+  TRIPLE
+  QUAD
+  SUITE
+  DELUXE
+  DORMITORY
+  STUDIO
+}
+
+enum RoomCategory {
+  ECONOMY      // Cheap, basic amenities
+  MODERATE     // Standard, good amenities
+  PREMIUM      // Very good, better amenities
+  ELITE        // Luxury, best amenities
+  VIP          // Exclusive, top-tier service
 }
