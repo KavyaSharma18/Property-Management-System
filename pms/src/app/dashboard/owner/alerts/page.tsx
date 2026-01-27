@@ -1,6 +1,7 @@
 "use client";
 
 import { use } from "react";
+import { useSession } from "next-auth/react";
 import DashboardHeader from "@/components/dashboard/header";
 import Sidebar from "@/components/dashboard/sidebar";
 import { Button } from "@/components/ui/button";
@@ -16,17 +17,15 @@ interface Alert {
   id: string;
   severity: "high" | "medium" | "low";
   message: string;
-  propertyName: string;
+  propertyId: string;
+  propertySnapshot: { id: string; name: string };
   timestamp: string;
   isRead: boolean;
 }
 
 export default function AlertsPage({ params }: Props) {
   const { id } = use(params);
-
-  const session = {
-    user: { name: "Demo Owner", email: "owner@demo.com", role: "OWNER" },
-  };
+  const { data: session } = useSession();
 
   // Mock alerts data
   const [alerts, setAlerts] = useState<Alert[]>([
@@ -34,7 +33,8 @@ export default function AlertsPage({ params }: Props) {
       id: "alert_1",
       severity: "high",
       message: "High occupancy rate detected",
-      propertyName: "Seaside Retreat",
+      propertyId: "prop_1",
+      propertySnapshot: { id: "prop_1", name: "Seaside Retreat" },
       timestamp: "2 hours ago",
       isRead: false,
     },
@@ -42,7 +42,8 @@ export default function AlertsPage({ params }: Props) {
       id: "alert_2",
       severity: "medium",
       message: "Payment pending from guest",
-      propertyName: "Mountain View Inn",
+      propertyId: "prop_2",
+      propertySnapshot: { id: "prop_2", name: "Mountain View Inn" },
       timestamp: "5 hours ago",
       isRead: false,
     },
@@ -50,7 +51,8 @@ export default function AlertsPage({ params }: Props) {
       id: "alert_3",
       severity: "low",
       message: "Room cleaning completed",
-      propertyName: "Lakeside Hotel",
+      propertyId: "prop_3",
+      propertySnapshot: { id: "prop_3", name: "Lakeside Hotel" },
       timestamp: "1 day ago",
       isRead: true,
     },
@@ -58,7 +60,8 @@ export default function AlertsPage({ params }: Props) {
       id: "alert_4",
       severity: "high",
       message: "Unusual guest activity detected",
-      propertyName: "Urban Central Hotel",
+      propertyId: "prop_4",
+      propertySnapshot: { id: "prop_4", name: "Urban Central Hotel" },
       timestamp: "3 days ago",
       isRead: true,
     },
@@ -73,6 +76,8 @@ export default function AlertsPage({ params }: Props) {
   };
 
   const handleDelete = (alertId: string) => {
+    const ok = window.confirm("Delete this alert? This cannot be undone.");
+    if (!ok) return;
     setAlerts(alerts.filter((alert) => alert.id !== alertId));
   };
 
@@ -107,9 +112,9 @@ export default function AlertsPage({ params }: Props) {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <DashboardHeader
-        userName={session.user?.name}
-        userEmail={session.user?.email}
-        userRole="OWNER"
+        userName={session?.user?.name}
+        userEmail={session?.user?.email}
+        userRole={(session?.user as { role?: string } | undefined)?.role || "OWNER"}
       />
 
       <div className="flex">
@@ -156,7 +161,7 @@ export default function AlertsPage({ params }: Props) {
                             )}
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">
-                            {alert.propertyName} • {alert.timestamp}
+                              {alert.propertySnapshot?.name} • {alert.timestamp}
                           </p>
                         </div>
                       </div>
