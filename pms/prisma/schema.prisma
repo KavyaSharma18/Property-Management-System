@@ -57,34 +57,55 @@ model ambiguity_events {
 }
 
 model guests {
-  id          String        @id @default(cuid())
-  name        String
-  email       String?
-  phone       String
-  idProof     String?
-  address     String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  occupancies occupancies[]
+  id               String             @id @default(cuid())
+  name             String
+  email            String?
+  phone            String
+  alternatePhone   String?            // Secondary contact number
+  idProofType      String?            // AADHAR, PASSPORT, DRIVING_LICENSE, VOTER_ID
+  idProofNumber    String?            // ID proof number
+  idProofImage     String?            // URL to uploaded ID proof image
+  address          String?
+  city             String?
+  state            String?
+  country          String?            @default("India")
+  nationality      String?            @default("Indian")
+  dateOfBirth      DateTime?          // For age verification
+  gender           String?            // MALE, FEMALE, OTHER
+  emergencyContact String?            // Emergency contact name
+  emergencyPhone   String?            // Emergency contact number
+  notes            String?            // Any special notes about guest
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  occupancies      occupancies[]
+  occupancy_guests occupancy_guests[] // All room bookings this guest is part of
 }
 
 model occupancies {
-  id                String    @id @default(cuid())
-  checkInTime       DateTime  @default(now())
-  expectedCheckOut  DateTime
-  actualCheckOut    DateTime?
-  numberOfOccupants Int
-  totalAmount       Float?
-  isPaid            Boolean   @default(false)
+  id                String             @id @default(cuid())
+  checkInTime       DateTime           @default(now())
+  expectedCheckOut  DateTime?          // Optional - may not be known at booking
+  actualCheckOut    DateTime?          // Set when guest actually checks out
+  numberOfOccupants Int                // Number of guests in this booking
+  actualCapacity    Int?               // Dynamic capacity set at booking (can exceed room default)
+  actualRoomRate    Float              // Price per night set during booking (may differ from room default)
+  totalAmount       Float              // Total amount (nights × actualRoomRate)
+  paidAmount        Float?             @default(0) // Total paid so far
+  balanceAmount     Float?             // Remaining to be paid (totalAmount - paidAmount)
+  lastPaidDate      DateTime?          // Last date payment covers up to
   notes             String?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
   roomId            String
-  guestId           String
+  guestId           String             // Primary guest (main booker)
   checkedInBy       String
-  users             users     @relation(fields: [checkedInBy], references: [id])
-  guests            guests    @relation(fields: [guestId], references: [id], onDelete: Cascade)
-  rooms             rooms     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  groupBookingId    String?
+  users             users              @relation(fields: [checkedInBy], references: [id])
+  guests            guests             @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  rooms             rooms              @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  group_bookings    group_bookings?    @relation(fields: [groupBookingId], references: [id])
+  occupancy_guests  occupancy_guests[] // All guests in this room
+  payments          payments[]         // All payment transactions
 }
 
 model properties {
@@ -111,6 +132,7 @@ model properties {
   users_properties_ownerIdTousers        users              @relation("properties_ownerIdTousers", fields: [ownerId], references: [id], onDelete: Cascade)
   users_properties_receptionistIdTousers users?             @relation("properties_receptionistIdTousers", fields: [receptionistId], references: [id])
   rooms                                  rooms[]
+  group_bookings                         group_bookings[]   // Group/corporate bookings
 }
 
 model floors {
@@ -132,8 +154,8 @@ model rooms {
   roomNumber    String
   roomType      RoomType
   roomCategory  RoomCategory  @default(MODERATE)
-  capacity      Int
-  pricePerNight Float
+  capacity      Int           // Recommended capacity
+  pricePerNight Float         // Default price (can be changed during booking)
   description   String?
   amenities     String?       // JSON string of room-specific amenities
   images        String?       // JSON array of room image URLs
@@ -163,6 +185,10 @@ model users {
   name                                        String?
   email                                       String             @unique
   emailVerified                               DateTime?
+  phone                                       String?            // Phone number
+  phoneVerified                               DateTime?          // Phone verification timestamp
+  phoneVerificationCode                       String?            // OTP for phone verification
+  phoneVerificationExpiry                     DateTime?          // OTP expiry time
   image                                       String?
   password                                    String?
   role                                        Role?
@@ -176,6 +202,8 @@ model users {
   properties_properties_ownerIdTousers        properties[]       @relation("properties_ownerIdTousers")
   properties_properties_receptionistIdTousers properties?        @relation("properties_receptionistIdTousers")
   sessions                                    sessions[]
+  group_bookings                              group_bookings[]   // Group bookings created
+  payments                                    payments[]         // Payments received
 }
 
 model verification_tokens {
@@ -195,6 +223,7 @@ enum Role {
   OWNER
   ADMIN
   RECEPTIONIST
+  HOUSEKEEPING
 }
 
 enum RoomStatus {
@@ -202,6 +231,8 @@ enum RoomStatus {
   OCCUPIED
   MAINTENANCE
   RESERVED
+  DIRTY      // Needs cleaning after checkout
+  CLEANING   // Currently being cleaned
 }
 
 enum RoomType {
@@ -221,4 +252,54 @@ enum RoomCategory {
   PREMIUM      // Very good, better amenities
   ELITE        // Luxury, best amenities
   VIP          // Exclusive, top-tier service
+}
+
+// Junction table: Track all guests staying in each room booking
+model occupancy_guests {
+  id          String      @id @default(cuid())
+  occupancyId String
+  guestId     String
+  isPrimary   Boolean     @default(false) // Main guest who booked
+  createdAt   DateTime    @default(now())
+  occupancies occupancies @relation(fields: [occupancyId], references: [id], onDelete: Cascade)
+  guests      guests      @relation(fields: [guestId], references: [id], onDelete: Cascade)
+
+  @@unique([occupancyId, guestId])
+}
+
+// Group bookings: Multiple rooms booked together
+model group_bookings {
+  id           String        @id @default(cuid())
+  groupName    String        // Group/company name
+  propertyId   String
+  totalRooms   Int
+  checkInDate  DateTime
+  checkOutDate DateTime
+  contactName  String?
+  contactPhone String?
+  contactEmail String?
+  notes        String?
+  createdBy    String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  properties   properties    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  users        users         @relation(fields: [createdBy], references: [id])
+  occupancies  occupancies[] // All rooms in this group
+}
+
+// Payment transactions: Track all payments with partial payment support
+model payments {
+  id            String      @id @default(cuid())
+  occupancyId   String
+  amount        Float       // Amount paid in this transaction
+  paymentMethod String      // CASH, CARD, UPI, BANK_TRANSFER, CHEQUE
+  paymentDate   DateTime    @default(now())
+  paidUpToDate  DateTime?   // Date this payment covers up to (for partial payments)
+  transactionId String?     // Reference for digital payments
+  notes         String?
+  receivedBy    String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  occupancies   occupancies @relation(fields: [occupancyId], references: [id], onDelete: Cascade)
+  users         users       @relation(fields: [receivedBy], references: [id])
 }

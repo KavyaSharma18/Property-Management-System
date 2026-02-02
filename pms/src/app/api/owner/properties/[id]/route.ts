@@ -102,9 +102,9 @@ export async function GET(
     property.rooms.forEach((room) => {
       room.occupancies.forEach((occupancy) => {
         totalOccupants += occupancy.numberOfOccupants;
-        // Only count paid revenue
-        if (occupancy.isPaid && occupancy.totalAmount) {
-          totalRevenue += occupancy.totalAmount;
+        // Count paid amount (partial or full payment)
+        if (occupancy.paidAmount) {
+          totalRevenue += occupancy.paidAmount;
         }
       });
     });

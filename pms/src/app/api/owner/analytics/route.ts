@@ -44,9 +44,9 @@ export async function GET(request: Request) {
           occupiedRooms++;
           room.occupancies.forEach((occupancy) => {
             totalOccupants += occupancy.numberOfOccupants;
-            // Only count revenue if payment is confirmed
-            if (occupancy.isPaid && occupancy.totalAmount) {
-              totalRevenue += occupancy.totalAmount;
+            // Count revenue from paid amount (partial or full)
+            if (occupancy.paidAmount) {
+              totalRevenue += occupancy.paidAmount;
             }
           });
         }
@@ -74,7 +74,7 @@ export async function GET(request: Request) {
         return (
           sum +
           room.occupancies.reduce(
-            (oSum, occ) => oSum + (occ.isPaid && occ.totalAmount ? occ.totalAmount : 0),
+            (oSum, occ) => oSum + (occ.paidAmount || 0),
             0
           )
         );
