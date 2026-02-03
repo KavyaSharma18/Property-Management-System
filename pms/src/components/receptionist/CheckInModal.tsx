@@ -19,7 +19,6 @@ interface CheckInData {
 	guestEmail: string;
 	guestPhone: string;
 	paymentMethod: string;
-	checkInDate: string;
 	checkOutDate: string;
 	numberOfGuests: number;
 }
@@ -37,7 +36,6 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 		guestEmail: "",
 		guestPhone: "",
 		paymentMethod: "cash",
-		checkInDate: new Date().toISOString().split('T')[0],
 		checkOutDate: "",
 		numberOfGuests: 1,
 	});
@@ -74,8 +72,9 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 		if (!formData.guestPhone.trim()) newErrors.guestPhone = "Phone number is required";
 		if (!formData.checkOutDate) newErrors.checkOutDate = "Check-out date is required";
 		
-		if (formData.checkOutDate && formData.checkInDate >= formData.checkOutDate) {
-			newErrors.checkOutDate = "Check-out must be after check-in date";
+		const today = new Date().toISOString().split("T")[0];
+		if (formData.checkOutDate && today >= formData.checkOutDate) {
+			newErrors.checkOutDate = "Check-out must be after today";
 		}
 
 		if (formData.numberOfGuests > room.capacity) {
@@ -101,7 +100,6 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 				guestEmail: "",
 				guestPhone: "",
 				paymentMethod: "cash",
-				checkInDate: new Date().toISOString().split('T')[0],
 				checkOutDate: "",
 				numberOfGuests: 1,
 			});
@@ -115,7 +113,6 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 			guestEmail: "",
 			guestPhone: "",
 			paymentMethod: "cash",
-			checkInDate: new Date().toISOString().split('T')[0],
 			checkOutDate: "",
 			numberOfGuests: 1,
 		});
@@ -200,16 +197,6 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 							
 							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 								<div>
-									<Label htmlFor="checkInDate">Check-In Date *</Label>
-									<Input
-										id="checkInDate"
-										type="date"
-										value={formData.checkInDate}
-										onChange={(e) => handleInputChange("checkInDate", e.target.value)}
-									/>
-								</div>
-
-								<div>
 									<Label htmlFor="checkOutDate">Check-Out Date *</Label>
 									<Input
 										id="checkOutDate"
@@ -263,24 +250,32 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 									<span className="text-sm text-muted-foreground">Price per night:</span>
 									<span className="font-semibold">${room.pricePerNight}</span>
 								</div>
-								{formData.checkInDate && formData.checkOutDate && formData.checkInDate < formData.checkOutDate && (
+								{formData.checkOutDate && (() => {
+									const today = new Date().toISOString().split("T")[0];
+									if (today >= formData.checkOutDate) return null;
+									const nights = Math.ceil(
+										(new Date(formData.checkOutDate).getTime() - new Date(today).getTime()) /
+											(1000 * 60 * 60 * 24)
+									);
+									return (
 									<>
 										<div className="flex justify-between items-center mt-2">
 											<span className="text-sm text-muted-foreground">
 												Number of nights:
 											</span>
 											<span className="font-semibold">
-												{Math.ceil((new Date(formData.checkOutDate).getTime() - new Date(formData.checkInDate).getTime()) / (1000 * 60 * 60 * 24))}
+												{nights}
 											</span>
 										</div>
 										<div className="flex justify-between items-center mt-2 pt-2 border-t">
 											<span className="font-semibold">Total Amount:</span>
 											<span className="text-xl font-bold text-blue-600">
-												${room.pricePerNight * Math.ceil((new Date(formData.checkOutDate).getTime() - new Date(formData.checkInDate).getTime()) / (1000 * 60 * 60 * 24))}
+												${room.pricePerNight * nights}
 											</span>
 										</div>
 									</>
-								)}
+								);
+							})()}
 							</div>
 						</div>
 					</div>

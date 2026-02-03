@@ -4,7 +4,6 @@
 // import { useSession } from "next-auth/react";
 // import DashboardHeader from "@/components/dashboard/header";
 // import Sidebar from "@/components/dashboard/sidebar";
-// import RoomDetailsModal from "@/components/receptionist/RoomDetailsModal";
 // import CheckInModal from "@/components/receptionist/CheckInModal";
 // import { Button } from "@/components/ui/button";
 // import { Card } from "@/components/ui/card";
@@ -509,8 +508,8 @@ import React, { useState } from "react";
 import { useSession } from "next-auth/react";
 import DashboardHeader from "@/components/dashboard/header";
 import Sidebar from "@/components/dashboard/sidebar";
-import RoomDetailsModal from "@/components/receptionist/RoomDetailsModal";
 import CheckInModal from "@/components/receptionist/CheckInModal";
+import RoomActionModal from "@/components/receptionist/room-action-modal";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -524,52 +523,86 @@ interface Room {
 	capacity: number;
 	pricePerNight: number;
 	guests: number;
+	floorNumber: number;
+	isGroupBooking?: boolean;
+	groupBookingName?: string;
+	paidAmount?: number;
+	bookingId?: string;
+	idProofType?: string;
+	idProofNumber?: string;
+	checkInAt?: string;
+	checkOutAt?: string;
+	expectedCheckOutDate?: string;
 	// Guest information (optional - only for occupied rooms)
 	guestName?: string;
 	guestEmail?: string;
 	guestPhone?: string;
 	paymentMethod?: string;
-	checkInDate?: string;
-	checkOutDate?: string;
 }
 
 // Mock room data
 const MOCK_ROOMS: Room[] = [
 	{
 		id: 1,
-		number: "101",
+		number: "G01",
 		type: "Single",
 		status: "occupied",
 		capacity: 1,
 		pricePerNight: 50,
 		guests: 1,
+		floorNumber: 0,
+		isGroupBooking: true,
+		groupBookingName: "Sundar Sharma",
+		paidAmount: 40,
+		bookingId: "BK-2026-0001",
+		idProofType: "AADHAR",
+		idProofNumber: "XXXX-1234",
+		checkInAt: "2026-02-02T10:15:00.000Z",
+		expectedCheckOutDate: "2026-02-05",
+		guestName: "Sundar Sharma",
+		guestEmail: "sundar@example.com",
+		guestPhone: "+91 98765 43210",
+		paymentMethod: "cash",
 	},
 	{
 		id: 2,
+		number: "G02",
+		type: "Double",
+		status: "vacant",
+		capacity: 2,
+		pricePerNight: 80,
+		guests: 0,
+		floorNumber: 0,
+	},
+	{
+		id: 3,
+		number: "101",
+		type: "Suite",
+		status: "occupied",
+		capacity: 4,
+		pricePerNight: 150,
+		guests: 3,
+		floorNumber: 1,
+		paidAmount: 150,
+		bookingId: "BK-2026-0002",
+		idProofType: "PASSPORT",
+		idProofNumber: "P1234567",
+		checkInAt: "2026-02-01T13:05:00.000Z",
+		expectedCheckOutDate: "2026-02-04",
+		guestName: "Aarav Patel",
+		guestEmail: "aarav@example.com",
+		guestPhone: "+91 99123 45678",
+		paymentMethod: "upi",
+	},
+	{
+		id: 4,
 		number: "102",
 		type: "Double",
 		status: "vacant",
 		capacity: 2,
 		pricePerNight: 80,
 		guests: 0,
-	},
-	{
-		id: 3,
-		number: "103",
-		type: "Suite",
-		status: "occupied",
-		capacity: 4,
-		pricePerNight: 150,
-		guests: 3,
-	},
-	{
-		id: 4,
-		number: "104",
-		type: "Double",
-		status: "vacant",
-		capacity: 2,
-		pricePerNight: 80,
-		guests: 0,
+		floorNumber: 1,
 	},
 	{
 		id: 5,
@@ -579,6 +612,17 @@ const MOCK_ROOMS: Room[] = [
 		capacity: 1,
 		pricePerNight: 50,
 		guests: 1,
+		floorNumber: 2,
+		paidAmount: 0,
+		bookingId: "BK-2026-0003",
+		idProofType: "DRIVING_LICENSE",
+		idProofNumber: "DL-9988",
+		checkInAt: "2026-02-03T09:40:00.000Z",
+		expectedCheckOutDate: "2026-02-06",
+		guestName: "Nisha Rao",
+		guestEmail: "nisha@example.com",
+		guestPhone: "+91 99887 76655",
+		paymentMethod: "credit_card",
 	},
 	{
 		id: 6,
@@ -588,6 +632,19 @@ const MOCK_ROOMS: Room[] = [
 		capacity: 2,
 		pricePerNight: 80,
 		guests: 2,
+		floorNumber: 2,
+		isGroupBooking: true,
+		groupBookingName: "Sundar Sharma",
+		paidAmount: 120,
+		bookingId: "BK-2026-0001",
+		idProofType: "AADHAR",
+		idProofNumber: "XXXX-1234",
+		checkInAt: "2026-02-02T10:18:00.000Z",
+		expectedCheckOutDate: "2026-02-05",
+		guestName: "Neha Sharma",
+		guestEmail: "neha@example.com",
+		guestPhone: "+91 98000 11111",
+		paymentMethod: "upi",
 	},
 	{
 		id: 7,
@@ -597,6 +654,7 @@ const MOCK_ROOMS: Room[] = [
 		capacity: 1,
 		pricePerNight: 0,
 		guests: 0,
+		floorNumber: 2,
 	},
 ];
 
@@ -611,7 +669,14 @@ export default function RoomsPage() {
 	const [typeFilter, setTypeFilter] = useState<"all" | "Single" | "Double" | "Suite">("all");
 	const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
 	const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
-	const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+	const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
+	const [paymentAmount, setPaymentAmount] = useState("");
+	const [priceDraft, setPriceDraft] = useState("");
+	const [editCheckOutDate, setEditCheckOutDate] = useState("");
+
+	const selectedRoom = selectedRoomId
+		? rooms.find((room) => room.id === selectedRoomId) || null
+		: null;
 
 	const filteredRooms = rooms.filter((room) => {
 		const matchesSearch = room.number.includes(searchTerm) || room.type.toLowerCase().includes(searchTerm.toLowerCase());
@@ -633,10 +698,11 @@ export default function RoomsPage() {
 
 		// If room is vacant, open check-in modal
 		if (room.status === "vacant") {
-			setSelectedRoom(room);
+			setSelectedRoomId(room.id);
 			setIsCheckInModalOpen(true);
 		} else if (room.status === "occupied") {
 			// If room is occupied, mark as maintenance and clear guest data
+			const checkoutTimestamp = new Date().toISOString();
 			setRooms((prevRooms) =>
 				prevRooms.map((r) =>
 					r.id === id ? { 
@@ -647,8 +713,13 @@ export default function RoomsPage() {
 						guestEmail: undefined,
 						guestPhone: undefined,
 						paymentMethod: undefined,
-						checkInDate: undefined,
-						checkOutDate: undefined,
+						checkInAt: undefined,
+						checkOutAt: checkoutTimestamp,
+						expectedCheckOutDate: undefined,
+						bookingId: undefined,
+						idProofType: undefined,
+						idProofNumber: undefined,
+						paidAmount: 0,
 					} : r
 				)
 			);
@@ -656,6 +727,7 @@ export default function RoomsPage() {
 	};
 
 	const handleCheckIn = (roomId: number, checkInData: any) => {
+		const checkInTimestamp = new Date().toISOString();
 		setRooms((prevRooms) =>
 			prevRooms.map((room) =>
 				room.id === roomId
@@ -667,14 +739,16 @@ export default function RoomsPage() {
 						guestEmail: checkInData.guestEmail,
 						guestPhone: checkInData.guestPhone,
 						paymentMethod: checkInData.paymentMethod,
-						checkInDate: checkInData.checkInDate,
-						checkOutDate: checkInData.checkOutDate,
+						checkInAt: checkInTimestamp,
+						expectedCheckOutDate: checkInData.checkOutDate,
+						checkOutAt: undefined,
+						paidAmount: 0,
 					}
 					: room
 			)
 		);
 		setIsCheckInModalOpen(false);
-		setSelectedRoom(null);
+		setSelectedRoomId(null);
 	};
 
 	const removeMaintenance = (id: number) => {
@@ -684,19 +758,130 @@ export default function RoomsPage() {
 	};
 
 	const openRoomModal = (room: Room) => {
-		setSelectedRoom(room);
+		setSelectedRoomId(room.id);
+		setPriceDraft(String(room.pricePerNight));
+		setPaymentAmount("");
+		setEditCheckOutDate(room.expectedCheckOutDate || "");
 		setIsRoomModalOpen(true);
 	};
 
 	const closeRoomModal = () => {
-		setSelectedRoom(null);
+		setSelectedRoomId(null);
 		setIsRoomModalOpen(false);
 	};
 
 	const closeCheckInModal = () => {
-		setSelectedRoom(null);
+		setSelectedRoomId(null);
 		setIsCheckInModalOpen(false);
 	};
+
+	const calculateNights = (room: Room) => {
+		if (!room.checkInAt || !(room.expectedCheckOutDate || room.checkOutAt)) return 1;
+		const checkIn = new Date(room.checkInAt);
+		const checkOut = new Date(room.expectedCheckOutDate || room.checkOutAt || room.checkInAt);
+		return Math.max(1, Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)));
+	};
+
+	const formatDate = (date?: string) => {
+		if (!date) return "N/A";
+		return new Date(date).toLocaleDateString("en-IN", {
+			year: "numeric",
+			month: "short",
+			day: "numeric",
+		});
+	};
+
+	const getTotalAmount = (room: Room) => {
+		if (room.status !== "occupied") return 0;
+		return calculateNights(room) * room.pricePerNight;
+	};
+
+	const getPaymentSummary = (room: Room) => {
+		const total = getTotalAmount(room);
+		const paid = room.paidAmount || 0;
+		const balance = Math.max(0, total - paid);
+		const status = total === 0 ? "N/A" : balance === 0 ? "Completed" : paid === 0 ? "Pending" : "Partial";
+		return { total, paid, balance, status };
+	};
+
+	const handleAddPayment = () => {
+		if (!selectedRoom) return;
+		const amount = Number(paymentAmount);
+		if (!amount || amount <= 0) return;
+		const { total, paid } = getPaymentSummary(selectedRoom);
+		const nextPaid = Math.min(total, paid + amount);
+		setRooms((prevRooms) =>
+			prevRooms.map((room) =>
+				room.id === selectedRoom.id ? { ...room, paidAmount: nextPaid } : room
+			)
+		);
+		setPaymentAmount("");
+	};
+
+	const handleUpdatePrice = () => {
+		if (!selectedRoom) return;
+		const nextPrice = Number(priceDraft);
+		if (!nextPrice || nextPrice <= 0) return;
+		setRooms((prevRooms) =>
+			prevRooms.map((room) =>
+				room.id === selectedRoom.id ? { ...room, pricePerNight: nextPrice } : room
+			)
+		);
+	};
+
+	const handleUpdateBooking = () => {
+		if (!selectedRoom) return;
+		const nextCheckOut = editCheckOutDate || selectedRoom.expectedCheckOutDate;
+		setRooms((prevRooms) =>
+			prevRooms.map((room) =>
+				room.id === selectedRoom.id
+					? {
+							...room,
+							expectedCheckOutDate: nextCheckOut,
+						}
+					: room
+			)
+		);
+	};
+	const formatDateTime = (date?: string) => {
+		if (!date) return "N/A";
+		return new Date(date).toLocaleString("en-IN", {
+			year: "numeric",
+			month: "short",
+			day: "numeric",
+			hour: "2-digit",
+			minute: "2-digit",
+		});
+	};
+
+	const getStatusStyles = (status: Room["status"]) => {
+		switch (status) {
+			case "vacant":
+				return "border-green-200 bg-green-50/60";
+			case "occupied":
+				return "border-orange-200 bg-orange-50/60";
+			case "maintenance":
+			default:
+				return "border-gray-200 bg-gray-100";
+		}
+	};
+
+	const getFloorLabel = (floorNumber: number) => {
+		if (floorNumber === 0) return "Ground Floor";
+		const suffix = floorNumber === 1 ? "st" : floorNumber === 2 ? "nd" : floorNumber === 3 ? "rd" : "th";
+		return `${floorNumber}${suffix} Floor`;
+	};
+
+	const roomsByFloor = filteredRooms.reduce<Record<number, Room[]>>((acc, room) => {
+		const key = room.floorNumber;
+		if (!acc[key]) acc[key] = [];
+		acc[key].push(room);
+		return acc;
+	}, {});
+
+	const floorOrder = Object.keys(roomsByFloor)
+		.map((f) => Number(f))
+		.sort((a, b) => a - b);
 
 	return (
 		<div className="min-h-screen bg-gray-50">
@@ -835,83 +1020,61 @@ export default function RoomsPage() {
 						</div>
 					</div>
 
-					{/* Rooms Table */}
-					<div className="overflow-x-auto">
-						<table className="w-full text-sm">
-							<thead>
-								<tr className="border-b border-gray-200">
-									<th className="px-4 py-3 text-left text-muted-foreground font-medium">Room Number</th>
-									<th className="px-4 py-3 text-left text-muted-foreground font-medium">Type</th>
-									<th className="px-4 py-3 text-left text-muted-foreground font-medium">Status</th>
-									<th className="px-4 py-3 text-left text-muted-foreground font-medium">Capacity</th>
-									<th className="px-4 py-3 text-left text-muted-foreground font-medium">Guests</th>
-									<th className="px-4 py-3 text-left text-muted-foreground font-medium">Price/Night</th>
-									<th className="px-4 py-3 text-left text-muted-foreground font-medium">Action</th>
-								</tr>
-							</thead>
-							<tbody>
-								{filteredRooms.map((room) => (
-									<tr
+					{/* Rooms by Floor */}
+					{floorOrder.map((floorNumber) => (
+						<div key={floorNumber} className="mb-8">
+							<div className="flex items-center justify-between mb-3">
+								<h2 className="text-xl font-semibold">{getFloorLabel(floorNumber)}</h2>
+								<span className="text-sm text-muted-foreground">
+									{roomsByFloor[floorNumber]?.length || 0} Rooms
+								</span>
+							</div>
+							<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2">
+								{roomsByFloor[floorNumber].map((room) => (
+									<button
 										key={room.id}
-										onClick={() => room.status !== "maintenance" && openRoomModal(room)}
-										className={`border-b border-gray-200 hover:bg-gray-50 transition ${
-											room.status !== "maintenance" ? "cursor-pointer" : "cursor-default"
-										}`}
+										type="button"
+										onClick={() => openRoomModal(room)}
+										className={`relative text-left rounded-md border p-2 shadow-sm transition hover:shadow-md ${getStatusStyles(room.status)}`}
 									>
-										<td className="px-4 py-3 font-semibold">#{room.number}</td>
-										<td className="px-4 py-3">{room.type}</td>
-										<td className="px-4 py-3">
+										{room.isGroupBooking && (
 											<span
-												className={`px-3 py-1 rounded-full text-xs font-medium ${
+												className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full bg-red-500"
+												title={`Group booking: ${room.groupBookingName || "Unknown"}`}
+											/>
+										)}
+
+										<div className="flex items-center justify-between mb-1">
+											<div className="text-sm font-semibold">#{room.number}</div>
+											<span
+												className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
 													room.status === "occupied"
-														? "bg-red-50 text-red-600"
+														? "bg-orange-100 text-orange-700"
 														: room.status === "vacant"
-														? "bg-green-50 text-green-600"
-														: "bg-gray-50 text-gray-600"
+														? "bg-green-100 text-green-700"
+														: "bg-gray-200 text-gray-700"
 												}`}
 											>
 												{room.status.charAt(0).toUpperCase() + room.status.slice(1)}
 											</span>
-										</td>
-										<td className="px-4 py-3">{room.capacity}</td>
-										<td className="px-4 py-3">{room.guests}</td>
-										<td className="px-4 py-3">${room.pricePerNight}</td>
-										<td className="px-4 py-3">
-											{room.status === "maintenance" ? (
-												<Button
-													size="sm"
-													variant="outline"
-													onClick={(e) => {
-														e.stopPropagation();
-														removeMaintenance(room.id);
-													}}
-													className="text-xs border-gray-400 text-gray-600 hover:bg-gray-50"
-												>
-													Remove Maintenance
-												</Button>
-											) : (
-												<Button
-													size="sm"
-													variant="outline"
-													onClick={(e) => {
-														e.stopPropagation();
-														toggleRoomStatus(room.id);
-													}}
-													className={`text-xs ${
-														room.status === "occupied"
-															? "border-green-600 text-green-600 hover:bg-green-50"
-															: "border-red-600 text-red-600 hover:bg-red-50"
-													}`}
-												>
-													{room.status === "occupied" ? "Mark Vacant" : "Mark Occupied"}
-												</Button>
-											)}
-										</td>
-									</tr>
+										</div>
+
+										<div className="text-[11px] text-muted-foreground mb-1">{room.type}</div>
+										<div className="grid grid-cols-2 gap-2 text-[11px]">
+											<div>
+												<p className="text-xs text-muted-foreground">Capacity</p>
+												<p className="font-medium">{room.capacity}</p>
+											</div>
+											<div className="col-span-2">
+												<p className="text-xs text-muted-foreground">Price / Night</p>
+												<p className="font-semibold">₹{room.pricePerNight}</p>
+											</div>
+										</div>
+									</button>
 								))}
-							</tbody>
-						</table>
-					</div>
+							</div>
+						</div>
+					))}
 
 					{filteredRooms.length === 0 && (
 						<div className="text-center py-12">
@@ -920,11 +1083,32 @@ export default function RoomsPage() {
 						</div>
 					)}
 
+
 					{/* Room Details Modal */}
-					<RoomDetailsModal
+					<RoomActionModal
 						open={isRoomModalOpen}
 						room={selectedRoom}
 						onClose={closeRoomModal}
+						onCheckIn={() => {
+							setIsRoomModalOpen(false);
+							setIsCheckInModalOpen(true);
+						}}
+						onMarkVacant={() => selectedRoom && toggleRoomStatus(selectedRoom.id)}
+						onRemoveMaintenance={() => selectedRoom && removeMaintenance(selectedRoom.id)}
+						paymentSummary={selectedRoom ? getPaymentSummary(selectedRoom) : null}
+						nights={selectedRoom ? calculateNights(selectedRoom) : 0}
+						formatDate={formatDate}
+						formatDateTime={formatDateTime}
+						paymentAmount={paymentAmount}
+						onPaymentAmountChange={setPaymentAmount}
+						onAddPayment={handleAddPayment}
+						priceDraft={priceDraft}
+						onPriceDraftChange={setPriceDraft}
+						onUpdatePrice={handleUpdatePrice}
+						editCheckOutDate={editCheckOutDate}
+						onEditCheckOutDateChange={setEditCheckOutDate}
+						onUpdateBooking={handleUpdateBooking}
+						getFloorLabel={getFloorLabel}
 					/>
 
 					{/* Check-In Modal */}

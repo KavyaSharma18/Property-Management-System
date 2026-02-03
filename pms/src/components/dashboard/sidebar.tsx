@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bell, Home, Building, User, DoorOpen } from "lucide-react";
+import { Bell, Home, Building, User, DoorOpen, Users } from "lucide-react";
 
 type Role = "owner" | "receptionist";
 
@@ -22,7 +22,7 @@ export default function Sidebar({ role }: SidebarProps) {
 	const isSectionActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
 	return (
-		<Card className="w-64 h-screen flex flex-col">
+		<Card className="w-64 min-h-screen h-full flex flex-col self-stretch sticky top-0">
 			<CardHeader className="h-16 flex items-center px-4">
 				<CardTitle className="text-lg text-primary">Sentinel PMS</CardTitle>
 			</CardHeader>
@@ -64,17 +64,31 @@ export default function Sidebar({ role }: SidebarProps) {
 					</>				)}
 
 				{role === "receptionist" && (
-					<Button
-						asChild
-						size="default"
-						variant={isSectionActive(`${base}/rooms`) ? "default" : "ghost"}
-						className="justify-start"
-					>
-						<Link href={`${base}/rooms`} className={isSectionActive(`${base}/rooms`) ? "font-semibold" : ""}>
-							<DoorOpen size={18} className="mr-2" />
-							Manage Rooms
-						</Link>
-					</Button>
+					<>
+						<Button
+							asChild
+							size="default"
+							variant={isSectionActive(`${base}/rooms`) ? "default" : "ghost"}
+							className="justify-start"
+						>
+							<Link href={`${base}/rooms`} className={isSectionActive(`${base}/rooms`) ? "font-semibold" : ""}>
+								<DoorOpen size={18} className="mr-2" />
+								Manage Rooms
+							</Link>
+						</Button>
+
+						<Button
+							asChild
+							size="default"
+							variant={isSectionActive(`${base}/bookings`) ? "default" : "ghost"}
+							className="justify-start"
+						>
+							<Link href={`${base}/bookings`} className={isSectionActive(`${base}/bookings`) ? "font-semibold" : ""}>
+								<Users size={18} className="mr-2" />
+								Manage Bookings
+							</Link>
+						</Button>
+					</>
 				)}
 
 				<Button asChild size="default" variant={isSectionActive("/profile") ? "default" : "ghost"} className="justify-start">
