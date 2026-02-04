@@ -12,7 +12,7 @@ import prisma from "@/lib/prisma";
 //   - numberOfOccupants: Number of people staying
 //   - actualRoomRate: Room rate per night
 //   - advancePayment (optional): Initial payment amount
-//   - paymentMethod: CASH | UPI | CARD | NEFT | CHEQUE
+//   - paymentMethod: CASH | CARD | UPI | BANK_TRANSFER | CHEQUE
 // Returns: Complete occupancy record with payment details
 export async function POST(req: NextRequest) {
   try {
@@ -27,17 +27,19 @@ export async function POST(req: NextRequest) {
 
     const {
       roomId,
-      checkInDate,
+      checkInTime,
       expectedCheckOut,
       actualRoomRate,
       actualCapacity,
       guests, // Array of guest objects with guest details
       initialPayment, // { amount, paymentMethod, transactionId }
       groupBookingId, // Optional
+      bookingSource, // Optional: Source of booking (WALK_IN, CORPORATE, etc.)
+      corporateBookingId, // Optional: Link to corporate booking
     } = body;
 
     // Validation
-    if (!roomId || !checkInDate || !actualRoomRate || !guests || guests.length === 0) {
+    if (!roomId || !checkInTime || !actualRoomRate || !guests || guests.length === 0) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
@@ -99,7 +101,7 @@ export async function POST(req: NextRequest) {
     // Calculate total amount
     let nights = 1;
     if (expectedCheckOut) {
-      const checkIn = new Date(checkInDate);
+      const checkIn = new Date(checkInTime);
       const checkOut = new Date(expectedCheckOut);
       nights = Math.ceil(
         (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)
@@ -140,6 +142,7 @@ export async function POST(req: NextRequest) {
               phone: guestData.phone,
               alternatePhone: guestData.alternatePhone,
               idProofType: guestData.idProofType,
+              otherIdProof: guestData.otherIdProof, // Custom ID proof if OTHER is selected
               idProofNumber: guestData.idProofNumber,
               idProofImage: guestData.idProofImage,
               address: guestData.address,
@@ -170,7 +173,7 @@ export async function POST(req: NextRequest) {
           roomId: roomId,
           guestId: createdGuests[0].guest.id, // Primary guest
           checkedInBy: userId,
-          checkInTime: new Date(checkInDate),
+          checkInTime: new Date(checkInTime),
           expectedCheckOut: expectedCheckOut
             ? new Date(expectedCheckOut)
             : null,
@@ -182,6 +185,8 @@ export async function POST(req: NextRequest) {
           balanceAmount,
           lastPaidDate: paidAmount > 0 ? new Date() : null,
           groupBookingId: groupBookingId || null,
+          bookingSource: bookingSource || "WALK_IN", // Default to WALK_IN
+          corporateBookingId: corporateBookingId || null, // Link to corporate if provided
         },
       });
 
@@ -202,9 +207,9 @@ export async function POST(req: NextRequest) {
             amount: paidAmount,
             paymentMethod: initialPayment.paymentMethod || "CASH",
             paymentDate: new Date(),
-            paidUpToDate: new Date(checkInDate),
+            paidUpToDate: new Date(checkInTime),
             transactionId: initialPayment.transactionId,
-            receivedBy: receptionist.name || "Receptionist",
+            receivedBy: userId,
           },
         });
       }
@@ -222,10 +227,10 @@ export async function POST(req: NextRequest) {
     const completeOccupancy = await prisma.occupancies.findUnique({
       where: { id: result.occupancy.id },
       include: {
-        room: true,
-        occupancyGuests: {
+        rooms: true,
+        occupancy_guests: {
           include: {
-            guest: true,
+            guests: true,
           },
         },
         payments: true,

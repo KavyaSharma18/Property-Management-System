@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
       select: {
         role: true,
         propertyId: true,
-        properties: {
+        properties_properties_receptionistIdTousers: {
           select: {
             id: true,
             name: true,
@@ -201,7 +201,7 @@ export async function GET(req: NextRequest) {
         start: startDate.toISOString().split("T")[0],
         end: endDate.toISOString().split("T")[0],
       },
-      property: receptionist.properties,
+      property: receptionist.properties_properties_receptionistIdTousers,
       totalEarnings,
       totalTransactions: filteredPayments.length,
       byPaymentMethod: Object.values(byPaymentMethod),

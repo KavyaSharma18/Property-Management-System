@@ -7,7 +7,7 @@ import prisma from "@/lib/prisma";
 // Body:
 //   - occupancyId: Booking ID to pay for
 //   - amount: Payment amount
-//   - paymentMethod: CASH | UPI | CARD | NEFT | CHEQUE
+//   - paymentMethod: CASH | CARD | UPI | BANK_TRANSFER | CHEQUE
 //   - transactionId (optional): Reference number
 //   - notes (optional): Payment notes
 // Returns: Updated occupancy with new balance
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
           paymentDate: new Date(),
           paidUpToDate: new Date(),
           transactionId,
-          receivedBy: receptionist.name || "Receptionist",
+          receivedBy: userId,
           notes,
         },
       });

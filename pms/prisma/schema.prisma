@@ -62,7 +62,8 @@ model guests {
   email            String?
   phone            String
   alternatePhone   String?            // Secondary contact number
-  idProofType      String?            // AADHAR, PASSPORT, DRIVING_LICENSE, VOTER_ID
+  idProofType      IdProofType?       // Type of ID proof
+  otherIdProof     String?            // Custom ID proof type if OTHER is selected
   idProofNumber    String?            // ID proof number
   idProofImage     String?            // URL to uploaded ID proof image
   address          String?
@@ -96,16 +97,19 @@ model occupancies {
   notes             String?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
-  roomId            String
-  guestId           String             // Primary guest (main booker)
-  checkedInBy       String
-  groupBookingId    String?
-  users             users              @relation(fields: [checkedInBy], references: [id])
-  guests            guests             @relation(fields: [guestId], references: [id], onDelete: Cascade)
-  rooms             rooms              @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  group_bookings    group_bookings?    @relation(fields: [groupBookingId], references: [id])
-  occupancy_guests  occupancy_guests[] // All guests in this room
-  payments          payments[]         // All payment transactions
+  roomId              String
+  guestId             String             // Primary guest (main booker)
+  checkedInBy         String
+  groupBookingId      String?
+  bookingSource       BookingSource      @default(WALK_IN) // How the booking was made
+  corporateBookingId  String?            // Reference to corporate booking if applicable
+  users               users              @relation(fields: [checkedInBy], references: [id])
+  guests              guests             @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  rooms               rooms              @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  group_bookings      group_bookings?    @relation(fields: [groupBookingId], references: [id])
+  corporate_bookings  corporate_bookings? @relation(fields: [corporateBookingId], references: [id])
+  occupancy_guests    occupancy_guests[] // All guests in this room
+  payments            payments[]         // All payment transactions
 }
 
 model properties {
@@ -130,9 +134,10 @@ model properties {
   ambiguity_events                       ambiguity_events[]
   floors                                 floors[]
   users_properties_ownerIdTousers        users              @relation("properties_ownerIdTousers", fields: [ownerId], references: [id], onDelete: Cascade)
-  users_properties_receptionistIdTousers users?             @relation("properties_receptionistIdTousers", fields: [receptionistId], references: [id])
+  users_properties_receptionistIdTousers users?               @relation("properties_receptionistIdTousers", fields: [receptionistId], references: [id])
   rooms                                  rooms[]
-  group_bookings                         group_bookings[]   // Group/corporate bookings
+  group_bookings                         group_bookings[]     // Group bookings
+  corporate_bookings                     corporate_bookings[] // Corporate bookings
 }
 
 model floors {
@@ -192,6 +197,7 @@ model users {
   image                                       String?
   password                                    String?
   role                                        Role?
+  propertyId                                  String?            // Property assigned to receptionist/staff
   isActive                                    Boolean            @default(true)
   createdAt                                   DateTime           @default(now())
   updatedAt                                   DateTime           @updatedAt
@@ -200,10 +206,11 @@ model users {
   ambiguity_events                            ambiguity_events[]
   occupancies                                 occupancies[]
   properties_properties_ownerIdTousers        properties[]       @relation("properties_ownerIdTousers")
-  properties_properties_receptionistIdTousers properties?        @relation("properties_receptionistIdTousers")
+  properties_properties_receptionistIdTousers properties?          @relation("properties_receptionistIdTousers")
   sessions                                    sessions[]
-  group_bookings                              group_bookings[]   // Group bookings created
-  payments                                    payments[]         // Payments received
+  group_bookings                              group_bookings[]     // Group bookings created
+  corporate_bookings                          corporate_bookings[] // Corporate bookings created
+  payments                                    payments[]           // Payments received
 }
 
 model verification_tokens {
@@ -212,46 +219,6 @@ model verification_tokens {
   expires    DateTime
 
   @@unique([identifier, token])
-}
-
-enum PropertyStatus {
-  ACTIVE
-  INACTIVE
-}
-
-enum Role {
-  OWNER
-  ADMIN
-  RECEPTIONIST
-  HOUSEKEEPING
-}
-
-enum RoomStatus {
-  VACANT
-  OCCUPIED
-  MAINTENANCE
-  RESERVED
-  DIRTY      // Needs cleaning after checkout
-  CLEANING   // Currently being cleaned
-}
-
-enum RoomType {
-  SINGLE
-  DOUBLE
-  TRIPLE
-  QUAD
-  SUITE
-  DELUXE
-  DORMITORY
-  STUDIO
-}
-
-enum RoomCategory {
-  ECONOMY      // Cheap, basic amenities
-  MODERATE     // Standard, good amenities
-  PREMIUM      // Very good, better amenities
-  ELITE        // Luxury, best amenities
-  VIP          // Exclusive, top-tier service
 }
 
 // Junction table: Track all guests staying in each room booking
@@ -287,6 +254,24 @@ model group_bookings {
   occupancies  occupancies[] // All rooms in this group
 }
 
+// Corporate bookings: Track company bookings with company details
+model corporate_bookings {
+  id              String        @id @default(cuid())
+  companyName     String        // Company/Organization name
+  contactPerson   String        // Primary contact person name
+  contactPhone    String
+  contactEmail    String?
+  gstNumber       String?       // GST registration number
+  notes           String?
+  propertyId      String
+  createdBy       String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  properties      properties    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  users           users         @relation(fields: [createdBy], references: [id])
+  occupancies     occupancies[] // All bookings under this corporate account
+}
+
 // Payment transactions: Track all payments with partial payment support
 model payments {
   id            String      @id @default(cuid())
@@ -302,4 +287,63 @@ model payments {
   updatedAt     DateTime    @updatedAt
   occupancies   occupancies @relation(fields: [occupancyId], references: [id], onDelete: Cascade)
   users         users       @relation(fields: [receivedBy], references: [id])
+}
+
+enum PropertyStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum Role {
+  OWNER
+  RECEPTIONIST
+}
+
+enum RoomStatus {
+  VACANT
+  OCCUPIED
+  MAINTENANCE
+  RESERVED
+  DIRTY      // Needs cleaning after checkout
+  CLEANING   // Currently being cleaned
+}
+
+enum RoomType {
+  DELUXE
+  SUITE
+  AC
+  NON_AC
+}
+
+enum RoomCategory {
+  ECONOMY      // Cheap, basic amenities
+  MODERATE     // Standard, good amenities
+  PREMIUM      // Very good, better amenities
+  ELITE        // Luxury, best amenities
+  VIP          // Exclusive, top-tier service
+}
+
+enum IdProofType {
+  AADHAAR_CARD
+  PASSPORT
+  DRIVING_LICENSE
+  VOTER_ID
+  PAN_CARD
+  RATION_CARD
+  OTHER
+}
+
+enum BookingSource {
+  WALK_IN           // Direct walk-in at property
+  PHONE_CALL        // Booked via phone
+  GOIBIBO           // Online travel agency
+  MAKEMYTRIP        // Online travel agency
+  BOOKING_DOT_COM   // Booking.com
+  AIRBNB            // Airbnb platform
+  AGODA             // Agoda platform
+  EXPEDIA           // Expedia platform
+  CORPORATE         // Corporate booking
+  TRAVEL_AGENT      // Through travel agent
+  WEBSITE           // Property's own website
+  OTHER             // Other sources
 }

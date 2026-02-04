@@ -114,6 +114,8 @@ export async function GET(req: NextRequest) {
         paidAmount: occ.paidAmount || 0,
         balanceAmount: occ.balanceAmount || 0,
         lastPaidDate: occ.lastPaidDate,
+        bookingSource: occ.bookingSource, // How the booking was made
+        corporateBookingId: occ.corporateBookingId, // Link to corporate booking if applicable
         nightsStayed: occ.actualCheckOut ? null : nightsStayed,
         isActive: !occ.actualCheckOut,
         isPaid: (occ.balanceAmount || 0) === 0,

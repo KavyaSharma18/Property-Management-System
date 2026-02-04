@@ -98,6 +98,8 @@ export async function GET(
         nightsStayed,
         isPaid: occupancy.balanceAmount === 0,
         isActive: !occupancy.actualCheckOut,
+        bookingSource: occupancy.bookingSource,
+        corporateBookingId: occupancy.corporateBookingId,
       },
     });
   } catch (error) {

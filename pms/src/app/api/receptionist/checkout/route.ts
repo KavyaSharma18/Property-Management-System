@@ -104,10 +104,10 @@ export async function POST(req: NextRequest) {
           actualCheckOut: new Date(),
         },
         include: {
-          room: true,
-          occupancyGuests: {
+          rooms: true,
+          occupancy_guests: {
             include: {
-              guest: true,
+              guests: true,
             },
           },
           payments: true,

@@ -78,12 +78,10 @@ export async function GET(req: NextRequest) {
             occupancies: {
               include: {
                 rooms: {
-                  where: {
-                    propertyId,
-                  },
                   select: {
                     roomNumber: true,
                     roomType: true,
+                    propertyId: true,
                   },
                 },
                 payments: true,
@@ -96,14 +94,14 @@ export async function GET(req: NextRequest) {
 
     // Filter guests who have stayed at this property
     const filteredGuests = guests.filter(
-      (guest) => guest.occupancy_guests.some((og: any) => og.occupancies.rooms !== null)
+      (guest) => guest.occupancy_guests.some((og) => og.occupancies.rooms?.propertyId === propertyId)
     );
 
     // Enrich guest data with stay history
     const enrichedGuests = filteredGuests.map((guest) => {
       const occupancies = guest.occupancy_guests
-        .map((og: any) => og.occupancies)
-        .filter((occ: any) => occ.rooms !== null);
+        .map((og) => og.occupancies)
+        .filter((occ) => occ.rooms?.propertyId === propertyId);
 
       const totalStays = occupancies.length;
       const totalSpent = occupancies.reduce((sum: number, occ: any) => sum + (occ.paidAmount || 0), 0);
@@ -151,8 +149,8 @@ export async function GET(req: NextRequest) {
         currentStay: currentStay
           ? {
               occupancyId: currentStay.id,
-              room: currentStay.room,
-              checkInDate: currentStay.checkInDate,
+              room: currentStay.rooms,
+              checkInTime: currentStay.checkInTime,
               balanceAmount: currentStay.balanceAmount,
             }
           : null,
@@ -257,6 +255,7 @@ export async function POST(req: NextRequest) {
         phone: body.phone,
         alternatePhone: body.alternatePhone,
         idProofType: body.idProofType,
+        otherIdProof: body.otherIdProof, // Custom ID proof if OTHER is selected
         idProofNumber: body.idProofNumber,
         idProofImage: body.idProofImage,
         address: body.address,

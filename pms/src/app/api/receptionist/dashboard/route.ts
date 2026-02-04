@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Get property with rooms and floors
+    // Get property with rooms
     const property = await prisma.properties.findUnique({
       where: { id: receptionist.propertyId },
       include: {
@@ -153,6 +153,18 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    // Booking source distribution (active occupancies)
+    const bookingSourceDistribution = activeOccupancies.reduce((acc, occ) => {
+      const source = occ.bookingSource || 'WALK_IN';
+      acc[source] = (acc[source] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Corporate bookings count
+    const corporateBookingsCount = activeOccupancies.filter(
+      (occ) => occ.corporateBookingId !== null
+    ).length;
+
     return NextResponse.json({
       property: {
         id: property.id,
@@ -172,6 +184,8 @@ export async function GET(req: NextRequest) {
           totalAmount: totalPendingAmount,
         },
         recentCheckIns,
+        bookingSourceDistribution,
+        corporateBookingsCount,
       },
     });
   } catch (error) {
