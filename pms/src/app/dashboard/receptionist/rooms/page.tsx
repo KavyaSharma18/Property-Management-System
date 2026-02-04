@@ -545,7 +545,7 @@ const MOCK_ROOMS: Room[] = [
 	{
 		id: 1,
 		number: "G01",
-		type: "Single",
+		type: "AC Room",
 		status: "occupied",
 		capacity: 1,
 		pricePerNight: 50,
@@ -567,7 +567,7 @@ const MOCK_ROOMS: Room[] = [
 	{
 		id: 2,
 		number: "G02",
-		type: "Double",
+		type: "Non-AC Room",
 		status: "vacant",
 		capacity: 2,
 		pricePerNight: 80,
@@ -597,7 +597,7 @@ const MOCK_ROOMS: Room[] = [
 	{
 		id: 4,
 		number: "102",
-		type: "Double",
+		type: "Deluxe",
 		status: "vacant",
 		capacity: 2,
 		pricePerNight: 80,
@@ -607,7 +607,7 @@ const MOCK_ROOMS: Room[] = [
 	{
 		id: 5,
 		number: "201",
-		type: "Single",
+		type: "AC Room",
 		status: "occupied",
 		capacity: 1,
 		pricePerNight: 50,
@@ -627,7 +627,7 @@ const MOCK_ROOMS: Room[] = [
 	{
 		id: 6,
 		number: "202",
-		type: "Double",
+		type: "Non-AC Room",
 		status: "occupied",
 		capacity: 2,
 		pricePerNight: 80,
@@ -649,7 +649,7 @@ const MOCK_ROOMS: Room[] = [
 	{
 		id: 7,
 		number: "203",
-		type: "Single",
+		type: "Deluxe",
 		status: "maintenance",
 		capacity: 1,
 		pricePerNight: 0,
@@ -666,7 +666,7 @@ export default function RoomsPage() {
 	const [searchTerm, setSearchTerm] = useState("");
 	const [statusFilter, setStatusFilter] = useState<"all" | "occupied" | "vacant" | "maintenance">("all");
 	const [capacityFilter, setCapacityFilter] = useState<"all" | "1" | "2" | "4">("all");
-	const [typeFilter, setTypeFilter] = useState<"all" | "Single" | "Double" | "Suite">("all");
+	const [typeFilter, setTypeFilter] = useState<"all" | "Suite" | "Deluxe" | "AC Room" | "Non-AC Room">("all");
 	const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
 	const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
 	const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
@@ -740,9 +740,11 @@ export default function RoomsPage() {
 						guestPhone: checkInData.guestPhone,
 						paymentMethod: checkInData.paymentMethod,
 						checkInAt: checkInTimestamp,
-						expectedCheckOutDate: checkInData.checkOutDate,
+						expectedCheckOutDate: checkInData.checkOutDate || undefined,
 						checkOutAt: undefined,
 						paidAmount: 0,
+						idProofType: checkInData.idProofType || undefined,
+						idProofNumber: checkInData.idProofNumber || undefined,
 					}
 					: room
 			)
@@ -897,65 +899,6 @@ export default function RoomsPage() {
 						<p className="text-muted-foreground">View and manage all rooms in your assigned property</p>
 					</div>
 
-					{/* Stats Cards */}
-					<div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-						<Card>
-							<div className="p-4">
-								<div className="flex items-center justify-between">
-									<div>
-										<p className="text-sm font-medium text-muted-foreground">Total Rooms</p>
-										<p className="text-3xl font-bold mt-2">{rooms.length}</p>
-									</div>
-									<div className="p-3 rounded-lg bg-blue-50">
-										<DoorOpen size={24} className="text-blue-500" />
-									</div>
-								</div>
-							</div>
-						</Card>
-
-						<Card>
-							<div className="p-4">
-								<div className="flex items-center justify-between">
-									<div>
-										<p className="text-sm font-medium text-muted-foreground">Vacant</p>
-										<p className="text-3xl font-bold text-green-600 mt-2">{vacantCount}</p>
-									</div>
-									<div className="p-3 rounded-lg bg-green-50">
-										<DoorOpen size={24} className="text-green-500" />
-									</div>
-								</div>
-							</div>
-						</Card>
-
-						<Card>
-							<div className="p-4">
-								<div className="flex items-center justify-between">
-									<div>
-										<p className="text-sm font-medium text-muted-foreground">Occupied</p>
-										<p className="text-3xl font-bold text-red-600 mt-2">{occupiedCount}</p>
-									</div>
-									<div className="p-3 rounded-lg bg-red-50">
-										<Users size={24} className="text-red-500" />
-									</div>
-								</div>
-							</div>
-						</Card>
-
-						<Card>
-							<div className="p-4">
-								<div className="flex items-center justify-between">
-									<div>
-										<p className="text-sm font-medium text-muted-foreground">Occupancy Rate</p>
-										<p className="text-3xl font-bold text-purple-600 mt-2">{occupancyRate}%</p>
-									</div>
-									<div className="p-3 rounded-lg bg-purple-50">
-										<span className="text-purple-600 font-bold">{occupancyRate}%</span>
-									</div>
-								</div>
-							</div>
-						</Card>
-					</div>
-
 					{/* Filters */}
 					<div className="mb-6 flex flex-col sm:flex-row gap-4">
 						<div className="flex-1 relative">
@@ -983,13 +926,14 @@ export default function RoomsPage() {
 						{/* Type Filter */}
 						<select
 							value={typeFilter}
-							onChange={(e) => setTypeFilter(e.target.value as "all" | "Single" | "Double" | "Suite")}
+							onChange={(e) => setTypeFilter(e.target.value as "all" | "Suite" | "Deluxe" | "AC Room" | "Non-AC Room")}
 							className="px-4 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 						>
 							<option value="all">All Types</option>
-							<option value="Single">Single</option>
-							<option value="Double">Double</option>
 							<option value="Suite">Suite</option>
+							<option value="Deluxe">Deluxe</option>
+							<option value="AC Room">AC Room</option>
+							<option value="Non-AC Room">Non-AC Room</option>
 						</select>
 
 						<div className="flex gap-2">

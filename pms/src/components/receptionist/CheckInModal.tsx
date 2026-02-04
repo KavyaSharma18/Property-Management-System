@@ -21,6 +21,8 @@ interface CheckInData {
 	paymentMethod: string;
 	checkOutDate: string;
 	numberOfGuests: number;
+	idProofType: string;
+	idProofNumber: string;
 }
 
 interface CheckInModalProps {
@@ -38,6 +40,8 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 		paymentMethod: "cash",
 		checkOutDate: "",
 		numberOfGuests: 1,
+		idProofType: "",
+		idProofNumber: "",
 	});
 
 	const [errors, setErrors] = useState<Partial<Record<keyof CheckInData, string>>>({});
@@ -70,15 +74,9 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 
 
 		if (!formData.guestPhone.trim()) newErrors.guestPhone = "Phone number is required";
-		if (!formData.checkOutDate) newErrors.checkOutDate = "Check-out date is required";
-		
 		const today = new Date().toISOString().split("T")[0];
 		if (formData.checkOutDate && today >= formData.checkOutDate) {
 			newErrors.checkOutDate = "Check-out must be after today";
-		}
-
-		if (formData.numberOfGuests > room.capacity) {
-			newErrors.numberOfGuests = `Maximum capacity is ${room.capacity}`;
 		}
 
 		if (formData.numberOfGuests < 1) {
@@ -102,6 +100,8 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 				paymentMethod: "cash",
 				checkOutDate: "",
 				numberOfGuests: 1,
+				idProofType: "",
+				idProofNumber: "",
 			});
 			setErrors({});
 		}
@@ -115,6 +115,8 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 			paymentMethod: "cash",
 			checkOutDate: "",
 			numberOfGuests: 1,
+			idProofType: "",
+			idProofNumber: "",
 		});
 		setErrors({});
 		onClose();
@@ -197,7 +199,7 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 							
 							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 								<div>
-									<Label htmlFor="checkOutDate">Check-Out Date *</Label>
+									<Label htmlFor="checkOutDate">Check-Out Date</Label>
 									<Input
 										id="checkOutDate"
 										type="date"
@@ -216,13 +218,11 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 										id="numberOfGuests"
 										type="number"
 										min="1"
-										max={room.capacity}
 										value={formData.numberOfGuests}
 										onChange={(e) => handleInputChange("numberOfGuests", parseInt(e.target.value) || 1)}
 										className={errors.numberOfGuests ? "border-red-500" : ""}
 									/>
 									{errors.numberOfGuests && <p className="text-red-500 text-xs mt-1">{errors.numberOfGuests}</p>}
-									<p className="text-xs text-muted-foreground mt-1">Max capacity: {room.capacity}</p>
 								</div>
 
 								<div>
@@ -238,7 +238,40 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 										<option value="debit_card">Debit Card</option>
 										<option value="upi">UPI</option>
 										<option value="bank_transfer">Bank Transfer</option>
+										<option value="aggregator">Aggregator</option>
+										<option value="corporate">Corporate</option>
 									</select>
+								</div>
+							</div>
+						</div>
+
+						{/* ID Proof */}
+						<div className="space-y-4 pt-4 border-t">
+							<h4 className="font-semibold text-lg">ID Proof</h4>
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+								<div>
+									<Label htmlFor="idProofType">ID Proof Type</Label>
+									<select
+										id="idProofType"
+										value={formData.idProofType}
+										onChange={(e) => handleInputChange("idProofType", e.target.value)}
+										className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+									>
+										<option value="">Select ID Type</option>
+										<option value="AADHAR">Aadhar</option>
+										<option value="PASSPORT">Passport</option>
+										<option value="DRIVING_LICENSE">Driving License</option>
+										<option value="VOTER_ID">Voter ID</option>
+									</select>
+								</div>
+								<div>
+									<Label htmlFor="idProofNumber">ID Proof Number</Label>
+									<Input
+										id="idProofNumber"
+										value={formData.idProofNumber}
+										onChange={(e) => handleInputChange("idProofNumber", e.target.value)}
+										placeholder="Enter ID number"
+									/>
 								</div>
 							</div>
 						</div>
