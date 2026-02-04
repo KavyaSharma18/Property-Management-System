@@ -47,6 +47,13 @@ export default async function ReceptionistDashboard() {
     occupancyRate: 70,
   };
 
+  const availableByCategory = [
+    { label: "Suite", available: 4 },
+    { label: "Deluxe", available: 6 },
+    { label: "AC Room", available: 5 },
+    { label: "Non-AC Room", available: 3 },
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <DashboardHeader
@@ -144,6 +151,25 @@ export default async function ReceptionistDashboard() {
                   className="bg-blue-500 h-2 rounded-full transition-all duration-300"
                   style={{ width: `${assignedProperty.occupancyRate}%` }}
                 ></div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Category Availability */}
+          <Card className="mt-6">
+            <CardContent className="p-6">
+              <h3 className="font-semibold text-lg mb-4">Available Rooms by Category</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Demo data (vacant rooms only). Will be fetched from database later.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {availableByCategory.map((category) => (
+                  <div key={category.label} className="p-4 rounded-lg border bg-white dark:bg-gray-900">
+                    <p className="text-sm text-muted-foreground">{category.label}</p>
+                    <p className="text-2xl font-bold mt-1">{category.available}</p>
+                    <p className="text-xs text-muted-foreground">available</p>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>

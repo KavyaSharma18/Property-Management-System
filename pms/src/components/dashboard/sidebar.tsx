@@ -80,6 +80,18 @@ export default function Sidebar({ role }: SidebarProps) {
 						<Button
 							asChild
 							size="default"
+							variant={isSectionActive(`${base}/checkouts`) ? "default" : "ghost"}
+							className="justify-start"
+						>
+							<Link href={`${base}/checkouts`} className={isSectionActive(`${base}/checkouts`) ? "font-semibold" : ""}>
+								<DoorOpen size={18} className="mr-2" />
+								Checkouts
+							</Link>
+						</Button>
+
+						<Button
+							asChild
+							size="default"
 							variant={isSectionActive(`${base}/bookings`) ? "default" : "ghost"}
 							className="justify-start"
 						>
