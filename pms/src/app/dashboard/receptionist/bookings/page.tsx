@@ -115,7 +115,7 @@ export default function ManageBookingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <DashboardHeader />
 
       <div className="flex">

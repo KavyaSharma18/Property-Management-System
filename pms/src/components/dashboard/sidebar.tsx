@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Bell, Home, Building, User, DoorOpen, Users } from "lucide-react";
+import { Bell, Home, Building, User, DoorOpen, Users, IndianRupee } from "lucide-react";
 
 type Role = "owner" | "receptionist";
 
@@ -53,6 +53,18 @@ export default function Sidebar({ role }: SidebarProps) {
 						<Button
 							asChild
 							size="default"
+							variant={isSectionActive(`${base}/payments`) ? "default" : "ghost"}
+							className="justify-start"
+						>
+							<Link href={`${base}/payments`} className={isSectionActive(`${base}/payments`) ? "font-semibold" : ""}>
+								<IndianRupee size={18} className="mr-2" />
+								Payments
+							</Link>
+						</Button>
+
+						<Button
+							asChild
+							size="default"
 							variant={isExact(`${base}/alerts`) ? "default" : "ghost"}
 							className="justify-start"
 						>
@@ -74,6 +86,18 @@ export default function Sidebar({ role }: SidebarProps) {
 							<Link href={`${base}/rooms`} className={isSectionActive(`${base}/rooms`) ? "font-semibold" : ""}>
 								<DoorOpen size={18} className="mr-2" />
 								Manage Rooms
+							</Link>
+						</Button>
+
+						<Button
+							asChild
+							size="default"
+							variant={isSectionActive(`${base}/payments`) ? "default" : "ghost"}
+							className="justify-start"
+						>
+							<Link href={`${base}/payments`} className={isSectionActive(`${base}/payments`) ? "font-semibold" : ""}>
+								<IndianRupee size={18} className="mr-2" />
+								Payments
 							</Link>
 						</Button>
 

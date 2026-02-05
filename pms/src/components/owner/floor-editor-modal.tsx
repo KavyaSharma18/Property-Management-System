@@ -89,7 +89,7 @@ export default function FloorEditorModal({ isOpen, onClose, floor, onSave }: Flo
 
               <div className="space-y-3">
                 {draft.rooms.map((room) => (
-                  <div key={room.id} className="p-3 border rounded">
+                  <div key={room.id} className="p-3 border dark:border-gray-700 rounded">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
                       <div>
                         <Label>Room Number <span className="text-red-500">*</span></Label>
@@ -98,7 +98,7 @@ export default function FloorEditorModal({ isOpen, onClose, floor, onSave }: Flo
 
                       <div>
                         <Label>Type <span className="text-red-500">*</span></Label>
-                        <select value={room.roomType} onChange={(e) => updateRoom(room.id, { roomType: e.target.value })} className="w-full rounded border p-2">
+                        <select value={room.roomType} onChange={(e) => updateRoom(room.id, { roomType: e.target.value })} className="w-full rounded border dark:border-gray-600 dark:bg-gray-700 dark:text-white p-2">
                           <option value="SINGLE">Single</option>
                           <option value="DOUBLE">Double</option>
                           <option value="SUITE">Suite</option>
@@ -108,7 +108,7 @@ export default function FloorEditorModal({ isOpen, onClose, floor, onSave }: Flo
 
                       <div>
                         <Label>Category</Label>
-                        <select value={room.roomCategory} onChange={(e) => updateRoom(room.id, { roomCategory: e.target.value })} className="w-full rounded border p-2">
+                        <select value={room.roomCategory} onChange={(e) => updateRoom(room.id, { roomCategory: e.target.value })} className="w-full rounded border dark:border-gray-600 dark:bg-gray-700 dark:text-white p-2">
                           <option value="ECONOMY">Economy</option>
                           <option value="MODERATE">Moderate</option>
                           <option value="PREMIUM">Premium</option>

@@ -36,10 +36,10 @@ export default function BookingEditModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xl bg-white rounded-lg shadow-lg overflow-hidden"
+        className="w-full max-w-xl bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-6 border-b">
+        <div className="flex items-center justify-between p-6 border-b dark:border-gray-700">
           <div>
             <h3 className="text-xl font-semibold">Edit Booking</h3>
             <p className="text-sm text-muted-foreground">{bookingId}</p>

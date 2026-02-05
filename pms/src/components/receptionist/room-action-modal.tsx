@@ -84,10 +84,10 @@ export default function RoomActionModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-3xl bg-white dark:bg-gray-950 rounded-lg shadow-lg overflow-hidden max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-3xl bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-6 border-b">
+        <div className="flex items-center justify-between p-6 border-b dark:border-gray-700">
           <div>
             <h3 className="text-xl font-semibold">Room #{room.number}</h3>
             <p className="text-sm text-muted-foreground">
@@ -105,24 +105,24 @@ export default function RoomActionModal({
 
         <div className="p-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 rounded-lg bg-gray-50">
+            <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700">
               <p className="text-xs text-muted-foreground">Status</p>
               <p className="font-semibold capitalize">{room.status}</p>
             </div>
-            <div className="p-4 rounded-lg bg-gray-50">
+            <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700">
               <p className="text-xs text-muted-foreground">Capacity</p>
               <p className="font-semibold">{room.capacity} Guests</p>
             </div>
-            <div className="p-4 rounded-lg bg-gray-50">
+            <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700">
               <p className="text-xs text-muted-foreground">Current Guests</p>
               <p className="font-semibold">{room.guests}</p>
             </div>
-            <div className="p-4 rounded-lg bg-gray-50">
+            <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700">
               <p className="text-xs text-muted-foreground">Price / Night</p>
               <p className="font-semibold">₹{room.pricePerNight}</p>
             </div>
             {room.status === "occupied" && (
-              <div className="md:col-span-2 p-4 rounded-lg bg-gray-50">
+              <div className="md:col-span-2 p-4 rounded-lg bg-gray-50 dark:bg-gray-700">
                 <p className="text-xs text-muted-foreground">Booking Window</p>
                 <p className="font-semibold">
                   {formatDateTime(room.checkInAt)} → {formatDate(room.expectedCheckOutDate)}
@@ -147,7 +147,7 @@ export default function RoomActionModal({
           )}
 
           {room.status === "occupied" && room.bookingId && (
-            <div className="rounded-lg border bg-white p-4">
+            <div className="rounded-lg border dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
               <p className="text-sm text-muted-foreground">Booking ID</p>
               <p className="font-semibold">{room.bookingId}</p>
               <div className="mt-2 text-sm text-muted-foreground">
@@ -157,7 +157,7 @@ export default function RoomActionModal({
           )}
 
           {room.status === "occupied" && paymentSummary && (
-            <div className="space-y-3 rounded-lg border bg-white p-4">
+            <div className="space-y-3 rounded-lg border dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">Payment Status</p>
                 <p className="font-semibold">{paymentSummary.status}</p>
@@ -189,23 +189,25 @@ export default function RoomActionModal({
             </div>
           )}
 
-          <div className="rounded-lg border bg-white p-4">
-            <p className="text-sm text-muted-foreground mb-2">Update Price / Night</p>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Input
-                value={priceDraft}
-                onChange={(e) => onPriceDraftChange(e.target.value)}
-                placeholder="New price"
-                type="number"
-              />
-              <Button variant="outline" onClick={onUpdatePrice}>
-                Update Price
-              </Button>
+          {room.status === "vacant" && (
+            <div className="rounded-lg border dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+              <p className="text-sm text-muted-foreground mb-2">Update Price / Night</p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Input
+                  value={priceDraft}
+                  onChange={(e) => onPriceDraftChange(e.target.value)}
+                  placeholder="New price"
+                  type="number"
+                />
+                <Button variant="outline" onClick={onUpdatePrice}>
+                  Update Price
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
 
           {room.status === "occupied" && (
-            <div className="rounded-lg border bg-white p-4">
+            <div className="rounded-lg border dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
               <p className="text-sm text-muted-foreground mb-2">Extend Booking</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <Input

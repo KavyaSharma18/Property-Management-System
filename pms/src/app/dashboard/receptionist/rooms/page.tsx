@@ -859,12 +859,12 @@ export default function RoomsPage() {
 	const getStatusStyles = (status: Room["status"]) => {
 		switch (status) {
 			case "vacant":
-				return "border-green-200 bg-green-50/60";
+				return "border-green-200 dark:border-green-900 bg-green-50/60 dark:bg-green-950/40";
 			case "occupied":
-				return "border-orange-200 bg-orange-50/60";
+				return "border-orange-200 dark:border-orange-900 bg-orange-50/60 dark:bg-orange-950/40";
 			case "maintenance":
 			default:
-				return "border-gray-200 bg-gray-100";
+				return "border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800";
 		}
 	};
 
@@ -886,7 +886,7 @@ export default function RoomsPage() {
 		.sort((a, b) => a - b);
 
 	return (
-		<div className="min-h-screen bg-gray-50">
+		<div className="min-h-screen bg-gray-50 dark:bg-gray-900">
 			<DashboardHeader />
 
 			<div className="flex">
@@ -915,7 +915,7 @@ export default function RoomsPage() {
 						<select
 							value={capacityFilter}
 							onChange={(e) => setCapacityFilter(e.target.value as "all" | "1" | "2" | "4")}
-							className="px-4 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+							className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 						>
 							<option value="all">All Capacities</option>
 							<option value="1">1 Person</option>
@@ -927,7 +927,7 @@ export default function RoomsPage() {
 						<select
 							value={typeFilter}
 							onChange={(e) => setTypeFilter(e.target.value as "all" | "Suite" | "Deluxe" | "AC Room" | "Non-AC Room")}
-							className="px-4 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+							className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 						>
 							<option value="all">All Types</option>
 							<option value="Suite">Suite</option>
@@ -981,22 +981,23 @@ export default function RoomsPage() {
 										onClick={() => openRoomModal(room)}
 										className={`relative text-left rounded-md border p-2 shadow-sm transition hover:shadow-md ${getStatusStyles(room.status)}`}
 									>
-										{room.isGroupBooking && (
-											<span
-												className="absolute right-3 top-3 h-2.5 w-2.5 rounded-full bg-red-500"
-												title={`Group booking: ${room.groupBookingName || "Unknown"}`}
-											/>
-										)}
-
 										<div className="flex items-center justify-between mb-1">
-											<div className="text-sm font-semibold">#{room.number}</div>
+											<div className="flex items-center gap-1">
+												<div className="text-sm font-semibold">#{room.number}</div>
+												{room.isGroupBooking && (
+													<span
+														className="h-2.5 w-2.5 rounded-full bg-red-500"
+														title={`Group booking: ${room.groupBookingName || "Unknown"}`}
+													/>
+												)}
+											</div>
 											<span
 												className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
 													room.status === "occupied"
-														? "bg-orange-100 text-orange-700"
-														: room.status === "vacant"
-														? "bg-green-100 text-green-700"
-														: "bg-gray-200 text-gray-700"
+													? "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-100"
+													: room.status === "vacant"
+													? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-100"
+													: "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-100"
 												}`}
 											>
 												{room.status.charAt(0).toUpperCase() + room.status.slice(1)}

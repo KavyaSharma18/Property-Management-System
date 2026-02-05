@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import DashboardHeader from "@/components/dashboard/header";
 import Sidebar from "@/components/dashboard/sidebar";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
+import RevenueCard from "@/components/owner/revenue-card";
 
 export default async function OwnerDashboard() {
 
@@ -61,12 +62,7 @@ export default async function OwnerDashboard() {
 
           {/* KPI Cards */}
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            <Card>
-              <CardContent>
-                <h3 className="text-sm font-medium text-muted-foreground">Total Revenue Generated</h3>
-                <p className="text-3xl font-bold mt-2">₹{dashboardStats.totalRevenue.toLocaleString("en-IN")}</p>
-              </CardContent>
-            </Card>
+            <RevenueCard />
 
             <Card>
               <CardContent>

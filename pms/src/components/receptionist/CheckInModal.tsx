@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import CorporateBookingModal from "./CorporateBookingModal";
 
 interface Room {
 	id: number;
@@ -14,6 +15,15 @@ interface Room {
 	guests: number;
 }
 
+interface CorporateBookingData {
+	companyName: string;
+	contactPerson: string;
+	contactPhone: string;
+	contactEmail: string;
+	gstNumber: string;
+	notes: string;
+}
+
 interface CheckInData {
 	guestName: string;
 	guestEmail: string;
@@ -23,6 +33,7 @@ interface CheckInData {
 	numberOfGuests: number;
 	idProofType: string;
 	idProofNumber: string;
+	corporateBooking?: CorporateBookingData;
 }
 
 interface CheckInModalProps {
@@ -45,6 +56,8 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 	});
 
 	const [errors, setErrors] = useState<Partial<Record<keyof CheckInData, string>>>({});
+	const [showCorporateModal, setShowCorporateModal] = useState(false);
+	const [corporateData, setCorporateData] = useState<CorporateBookingData | null>(null);
 
 	if (!open || !room) return null;
 
@@ -57,6 +70,11 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 		// Clear error when user starts typing
 		if (errors[field]) {
 			setErrors(prev => ({ ...prev, [field]: "" }));
+		}
+		
+		// Open corporate booking modal when corporate payment is selected
+		if (field === "paymentMethod" && value === "corporate") {
+			setShowCorporateModal(true);
 		}
 	};
 
@@ -83,15 +101,34 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 			newErrors.numberOfGuests = "At least 1 guest required";
 		}
 
+		if (!formData.idProofType.trim()) newErrors.idProofType = "ID proof type is required";
+		if (!formData.idProofNumber.trim()) newErrors.idProofNumber = "ID proof number is required";
+
 		setErrors(newErrors);
 		return Object.keys(newErrors).length === 0;
+	};
+
+	const handleCorporateBookingConfirm = (data: CorporateBookingData) => {
+		setCorporateData(data);
+		setFormData(prev => ({ ...prev, corporateBooking: data }));
+		setShowCorporateModal(false);
 	};
 
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault();
 		
+		// Check if corporate payment is selected but no corporate data
+		if (formData.paymentMethod === "corporate" && !corporateData) {
+			setShowCorporateModal(true);
+			return;
+		}
+		
 		if (validateForm()) {
-			onConfirm(room.id, formData);
+			const dataToSubmit = { ...formData };
+			if (corporateData) {
+				dataToSubmit.corporateBooking = corporateData;
+			}
+			onConfirm(room.id, dataToSubmit);
 			// Reset form
 			setFormData({
 				guestName: "",
@@ -104,6 +141,7 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 				idProofNumber: "",
 			});
 			setErrors({});
+			setCorporateData(null);
 		}
 	};
 
@@ -119,6 +157,7 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 			idProofNumber: "",
 		});
 		setErrors({});
+		setCorporateData(null);
 		onClose();
 	};
 
@@ -128,10 +167,10 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 			onClick={handleClose}
 		>
 			<div 
-				className="w-full max-w-2xl bg-white rounded-lg shadow-lg overflow-hidden max-h-[90vh] overflow-y-auto"
+				className="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden max-h-[90vh] overflow-y-auto"
 				onClick={handleModalClick}
 			>
-				<div className="flex items-center justify-between p-6 border-b bg-blue-50">
+				<div className="flex items-center justify-between p-6 border-b dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20">
 					<div>
 						<h3 className="text-xl font-semibold">Check-In Guest</h3>
 						<p className="text-sm text-muted-foreground mt-1">Room #{room.number} - {room.type}</p>
@@ -194,7 +233,7 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 						</div>
 
 						{/* Booking Details */}
-						<div className="space-y-4 pt-4 border-t">
+						<div className="space-y-4 pt-4 border-t dark:border-gray-700">
 							<h4 className="font-semibold text-lg">Booking Details</h4>
 							
 							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -231,7 +270,7 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 										id="paymentMethod"
 										value={formData.paymentMethod}
 										onChange={(e) => handleInputChange("paymentMethod", e.target.value)}
-										className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+										className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 									>
 										<option value="cash">Cash</option>
 										<option value="credit_card">Credit Card</option>
@@ -240,22 +279,34 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 										<option value="bank_transfer">Bank Transfer</option>
 										<option value="aggregator">Aggregator</option>
 										<option value="corporate">Corporate</option>
-									</select>
-								</div>
+									</select>								{formData.paymentMethod === "corporate" && corporateData && (
+									<div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">
+										✓ Corporate details added: {corporateData.companyName}
+										<button
+											type="button"
+											onClick={() => setShowCorporateModal(true)}
+											className="ml-2 underline hover:text-green-800"
+										>
+											Edit
+										</button>
+									</div>
+								)}								</div>
 							</div>
 						</div>
 
 						{/* ID Proof */}
-						<div className="space-y-4 pt-4 border-t">
+						<div className="space-y-4 pt-4 border-t dark:border-gray-700">
 							<h4 className="font-semibold text-lg">ID Proof</h4>
 							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 								<div>
-									<Label htmlFor="idProofType">ID Proof Type</Label>
+									<Label htmlFor="idProofType">ID Proof Type *</Label>
 									<select
 										id="idProofType"
 										value={formData.idProofType}
 										onChange={(e) => handleInputChange("idProofType", e.target.value)}
-										className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+										className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+											errors.idProofType ? "border-red-500" : "border-gray-300 dark:border-gray-600"
+										}`}
 									>
 										<option value="">Select ID Type</option>
 										<option value="AADHAR">Aadhar</option>
@@ -263,22 +314,25 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 										<option value="DRIVING_LICENSE">Driving License</option>
 										<option value="VOTER_ID">Voter ID</option>
 									</select>
+									{errors.idProofType && <p className="text-red-500 text-xs mt-1">{errors.idProofType}</p>}
 								</div>
 								<div>
-									<Label htmlFor="idProofNumber">ID Proof Number</Label>
+									<Label htmlFor="idProofNumber">ID Proof Number *</Label>
 									<Input
 										id="idProofNumber"
 										value={formData.idProofNumber}
 										onChange={(e) => handleInputChange("idProofNumber", e.target.value)}
 										placeholder="Enter ID number"
+										className={errors.idProofNumber ? "border-red-500" : ""}
 									/>
+									{errors.idProofNumber && <p className="text-red-500 text-xs mt-1">{errors.idProofNumber}</p>}
 								</div>
 							</div>
 						</div>
 
 						{/* Price Summary */}
-						<div className="pt-4 border-t">
-							<div className="bg-gray-50 p-4 rounded-lg">
+						<div className="pt-4 border-t dark:border-gray-700">
+							<div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
 								<div className="flex justify-between items-center">
 									<span className="text-sm text-muted-foreground">Price per night:</span>
 									<span className="font-semibold">${room.pricePerNight}</span>
@@ -313,7 +367,7 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 						</div>
 					</div>
 
-					<div className="flex items-center gap-3 mt-6 pt-4 border-t">
+					<div className="flex items-center gap-3 mt-6 pt-4 border-t dark:border-gray-700">
 						<Button 
 							type="button"
 							variant="outline"
@@ -331,6 +385,13 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 					</div>
 				</form>
 			</div>
+			
+			{/* Corporate Booking Modal */}
+			<CorporateBookingModal
+				open={showCorporateModal}
+				onClose={() => setShowCorporateModal(false)}
+				onConfirm={handleCorporateBookingConfirm}
+			/>
 		</div>
 	);
 };
