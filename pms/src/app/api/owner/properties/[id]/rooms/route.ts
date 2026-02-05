@@ -6,7 +6,7 @@ import prisma from "@/lib/prisma";
 // GET: Get all rooms for a property
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -16,7 +16,7 @@ export async function GET(
     }
 
     const ownerId = (session.user as any)?.id;
-    const propertyId = params.id;
+    const { id: propertyId } = await params;
 
     // Verify property ownership
     const property = await prisma.properties.findFirst({
@@ -41,6 +41,7 @@ export async function GET(
             id: true,
             floorNumber: true,
             floorName: true,
+            description: true,
           },
         },
         occupancies: {
@@ -79,7 +80,7 @@ export async function GET(
 // POST: Create a new room
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -89,7 +90,7 @@ export async function POST(
     }
 
     const ownerId = (session.user as any)?.id;
-    const propertyId = params.id;
+    const { id: propertyId } = await params;
     const body = await request.json();
     const {
       roomNumber,

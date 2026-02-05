@@ -98,10 +98,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Validate dates
+    const checkIn = new Date(checkInTime);
+    if (expectedCheckOut) {
+      const checkOut = new Date(expectedCheckOut);
+      
+      // Check-out must be after check-in
+      if (checkOut <= checkIn) {
+        return NextResponse.json(
+          { error: "Expected checkout date must be after check-in date" },
+          { status: 400 }
+        );
+      }
+
+      // Validate reasonable checkout date (not more than 1 year in future)
+      const oneYearFromNow = new Date();
+      oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+      if (checkOut > oneYearFromNow) {
+        return NextResponse.json(
+          { error: "Expected checkout date cannot be more than 1 year in the future" },
+          { status: 400 }
+        );
+      }
+    }
+
     // Calculate total amount
     let nights = 1;
     if (expectedCheckOut) {
-      const checkIn = new Date(checkInTime);
       const checkOut = new Date(expectedCheckOut);
       nights = Math.ceil(
         (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)

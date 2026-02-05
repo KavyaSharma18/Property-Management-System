@@ -8,7 +8,7 @@ import prisma from "@/lib/prisma";
 // Returns: Full occupancy info with room, guests, payments, and calculated stats
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -18,7 +18,7 @@ export async function GET(
     }
 
     const userId = (session.user as any)?.id;
-    const occupancyId = params.id;
+    const { id: occupancyId } = await params;
 
     // Get receptionist's assigned property
     const receptionist = await prisma.users.findUnique({
@@ -120,7 +120,7 @@ export async function GET(
 // Returns: Updated occupancy record
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -130,7 +130,7 @@ export async function PUT(
     }
 
     const userId = (session.user as any)?.id;
-    const occupancyId = params.id;
+    const { id: occupancyId } = await params;
     const body = await req.json();
 
     const { expectedCheckOut, actualRoomRate, actualCapacity } = body;
@@ -197,9 +197,32 @@ export async function PUT(
     const updateData: any = {};
 
     if (expectedCheckOut !== undefined) {
-      updateData.expectedCheckOut = expectedCheckOut
-        ? new Date(expectedCheckOut)
-        : null;
+      if (expectedCheckOut) {
+        const checkOutDate = new Date(expectedCheckOut);
+        const checkInDate = new Date(occupancy.checkInTime);
+
+        // Validate checkout is after check-in
+        if (checkOutDate <= checkInDate) {
+          return NextResponse.json(
+            { error: "Expected checkout date must be after check-in date" },
+            { status: 400 }
+          );
+        }
+
+        // Validate reasonable checkout date (not more than 1 year from check-in)
+        const oneYearFromCheckIn = new Date(checkInDate);
+        oneYearFromCheckIn.setFullYear(oneYearFromCheckIn.getFullYear() + 1);
+        if (checkOutDate > oneYearFromCheckIn) {
+          return NextResponse.json(
+            { error: "Expected checkout date cannot be more than 1 year from check-in" },
+            { status: 400 }
+          );
+        }
+
+        updateData.expectedCheckOut = checkOutDate;
+      } else {
+        updateData.expectedCheckOut = null;
+      }
     }
 
     if (actualRoomRate !== undefined) {

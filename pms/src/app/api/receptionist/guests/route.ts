@@ -126,6 +126,18 @@ export async function GET(req: NextRequest) {
       // Check if currently staying
       const currentStay = occupancies.find((occ: any) => !occ.actualCheckOut);
 
+      // Calculate age if dateOfBirth exists
+      let age = null;
+      if (guest.dateOfBirth) {
+        const birthDate = new Date(guest.dateOfBirth);
+        const today = new Date();
+        age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+        }
+      }
+
       return {
         id: guest.id,
         name: guest.name,
@@ -140,6 +152,7 @@ export async function GET(req: NextRequest) {
         country: guest.country,
         nationality: guest.nationality,
         dateOfBirth: guest.dateOfBirth,
+        age: age,
         gender: guest.gender,
         emergencyContact: guest.emergencyContact,
         emergencyPhone: guest.emergencyPhone,

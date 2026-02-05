@@ -6,7 +6,7 @@ import prisma from "@/lib/prisma";
 // GET: Get detailed information about a specific property
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -16,7 +16,7 @@ export async function GET(
     }
 
     const ownerId = (session.user as any)?.id;
-    const propertyId = params.id;
+    const { id: propertyId } = await params;
 
     const property = await prisma.properties.findFirst({
       where: {
@@ -33,7 +33,11 @@ export async function GET(
           },
         },
         floors: {
-          include: {
+          select: {
+            id: true,
+            floorNumber: true,
+            floorName: true,
+            description: true,
             _count: {
               select: {
                 rooms: true,
@@ -49,6 +53,7 @@ export async function GET(
                 id: true,
                 floorNumber: true,
                 floorName: true,
+                description: true,
               },
             },
             occupancies: {
@@ -160,7 +165,7 @@ export async function GET(
 // PUT: Update property details
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -170,7 +175,7 @@ export async function PUT(
     }
 
     const ownerId = (session.user as any)?.id;
-    const propertyId = params.id;
+    const { id: propertyId } = await params;
     const body = await request.json();
     const { 
       name, 
@@ -284,7 +289,7 @@ export async function PUT(
 // DELETE: Delete property (only if no active occupancies)
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -294,7 +299,7 @@ export async function DELETE(
     }
 
     const ownerId = (session.user as any)?.id;
-    const propertyId = params.id;
+    const { id: propertyId } = await params;
 
     // Check if property belongs to owner
     const property = await prisma.properties.findFirst({

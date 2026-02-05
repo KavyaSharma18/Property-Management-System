@@ -29,6 +29,7 @@ export async function GET(request: Request) {
             id: true,
             floorNumber: true,
             floorName: true,
+            description: true,
           },
           orderBy: { floorNumber: 'asc' },
         },
@@ -44,6 +45,8 @@ export async function GET(request: Request) {
     // Add room creation progress to each property
     const propertiesWithProgress = properties.map((property) => ({
       ...property,
+      amenities: property.amenities ? JSON.parse(property.amenities) : null,
+      images: property.images ? JSON.parse(property.images) : null,
       receptionist: property.users_properties_receptionistIdTousers,
       users_properties_receptionistIdTousers: undefined,
       actualRoomsCreated: property._count.rooms,

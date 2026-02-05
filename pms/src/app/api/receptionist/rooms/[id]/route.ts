@@ -8,7 +8,7 @@ import prisma from "@/lib/prisma";
 // Returns: Room info, current guest details, payment status, last 10 occupancies
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -18,7 +18,7 @@ export async function GET(
     }
 
     const userId = (session.user as any)?.id;
-    const roomId = params.id;
+    const { id: roomId } = await params;
 
     // Get receptionist's assigned property
     const receptionist = await prisma.users.findUnique({
@@ -57,6 +57,7 @@ export async function GET(
             id: true,
             floorNumber: true,
             floorName: true,
+            description: true,
           },
         },
         occupancies: {
@@ -186,7 +187,7 @@ export async function GET(
 // Returns: Updated room details
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -196,7 +197,7 @@ export async function PATCH(
     }
 
     const userId = (session.user as any)?.id;
-    const roomId = params.id;
+    const { id: roomId } = await params;
     const body = await req.json();
     const { status } = body;
 

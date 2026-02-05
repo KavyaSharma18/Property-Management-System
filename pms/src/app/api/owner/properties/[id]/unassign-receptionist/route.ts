@@ -6,7 +6,7 @@ import prisma from "@/lib/prisma";
 // DELETE: Remove receptionist from property
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -16,7 +16,7 @@ export async function DELETE(
     }
 
     const ownerId = (session.user as any)?.id;
-    const propertyId = params.id;
+    const { id: propertyId } = await params;
 
     // Verify property ownership
     const property = await prisma.properties.findFirst({
@@ -49,21 +49,36 @@ export async function DELETE(
       );
     }
 
-    // Unassign receptionist
-    const updatedProperty = await prisma.properties.update({
-      where: { id: propertyId },
-      data: {
-        receptionistId: null,
-      },
-      include: {
-        users_properties_receptionistIdTousers: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
+    const receptionistId = property.receptionistId;
+
+    // Unassign receptionist (update both sides of the relationship)
+    const updatedProperty = await prisma.$transaction(async (tx) => {
+      // Remove receptionist from property
+      const property = await tx.properties.update({
+        where: { id: propertyId },
+        data: {
+          receptionistId: null,
+        },
+        include: {
+          users_properties_receptionistIdTousers: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
           },
         },
-      },
+      });
+
+      // Remove property assignment from receptionist
+      await tx.users.update({
+        where: { id: receptionistId },
+        data: {
+          propertyId: null,
+        },
+      });
+
+      return property;
     });
 
     return NextResponse.json(

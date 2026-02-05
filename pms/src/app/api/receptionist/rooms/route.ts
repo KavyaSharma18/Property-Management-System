@@ -82,6 +82,7 @@ export async function GET(req: NextRequest) {
             id: true,
             floorNumber: true,
             floorName: true,
+            description: true,
           },
         },
         occupancies: {

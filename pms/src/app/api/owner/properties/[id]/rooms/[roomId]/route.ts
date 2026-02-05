@@ -6,7 +6,7 @@ import prisma from "@/lib/prisma";
 // GET: Get specific room details
 export async function GET(
   request: Request,
-  { params }: { params: { id: string; roomId: string } }
+  { params }: { params: Promise<{ id: string; roomId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -16,7 +16,7 @@ export async function GET(
     }
 
     const ownerId = (session.user as any)?.id;
-    const { id: propertyId, roomId } = params;
+    const { id: propertyId, roomId } = await params;
 
     // Verify property ownership
     const property = await prisma.properties.findFirst({
@@ -38,6 +38,7 @@ export async function GET(
             id: true,
             floorNumber: true,
             floorName: true,
+            description: true,
           },
         },
         occupancies: {
@@ -70,7 +71,7 @@ export async function GET(
 // PUT: Update room details
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string; roomId: string } }
+  { params }: { params: Promise<{ id: string; roomId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -80,7 +81,7 @@ export async function PUT(
     }
 
     const ownerId = (session.user as any)?.id;
-    const { id: propertyId, roomId } = params;
+    const { id: propertyId, roomId } = await params;
     const body = await request.json();
     const {
       roomNumber,
@@ -207,7 +208,7 @@ export async function PUT(
 // DELETE: Delete room (only if no active occupancies)
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string; roomId: string } }
+  { params }: { params: Promise<{ id: string; roomId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -217,7 +218,7 @@ export async function DELETE(
     }
 
     const ownerId = (session.user as any)?.id;
-    const { id: propertyId, roomId } = params;
+    const { id: propertyId, roomId } = await params;
 
     // Verify property ownership
     const property = await prisma.properties.findFirst({
