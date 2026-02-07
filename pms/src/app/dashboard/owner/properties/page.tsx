@@ -6,77 +6,52 @@ import Sidebar from "@/components/dashboard/sidebar";
 import { Button } from "@/components/ui/button";
 import { Building2, Plus } from "lucide-react";
 import PropertiesList from "@/components/owner/properties-list";
+import prisma from "@/lib/prisma";
 
 export default async function OwnerPropertiesPage() {
   const session = await getServerSession(authOptions);
 
   if (!session) redirect("/auth/signin");
 
-  //   const session =
-  // process.env.NODE_ENV === "development"
-  //   ? {
-  //       user: {
-  //         name: "Demo Owner",
-  //         email: "owner@demo.com",
-  //         role: "OWNER",
-  //       },
-  //     }
-  //   : await getServerSession(authOptions);
-
-  //   if (!session) redirect("/auth/signin");
-
-
   if ((session.user as any).role !== "OWNER") {
     redirect("/dashboard/receptionist");
   }
 
-  // Demo properties — replace with DB query to fetch properties for the authenticated owner
-  const properties: any[] =
-    process.env.NODE_ENV === "development"
-      ? [
-          {
-            id: "prop_1",
-            name: "Seaside Retreat",
-            address: "12 Ocean Drive, Beach City",
-            totalRooms: 24,
-            numberOfFloors: 3,
-            status: "ACTIVE",
-          },
-          {
-            id: "prop_2",
-            name: "Mountain View Inn",
-            address: "99 Alpine Rd, Hilltown",
-            totalRooms: 18,
-            numberOfFloors: 4,
-            status: "ACTIVE",
-          },
-          {
-        id: "prop_3",
-        name: "Lakeside Hotel",
-        address: "7 Lakeview Rd, Waterside",
-        totalRooms: 30,
-        numberOfFloors: 5,
-        status: "ACTIVE",
-      },
-      {
-        id: "prop_4",
-        name: "Urban Central Hotel",
-        address: "101 City Plaza, Metropolis",
-        totalRooms: 56,
-        numberOfFloors: 12,
-        status: "ACTIVE",
-      },
-      {
-        id: "prop_5",
-        name: "Garden Palace",
-        address: "22 Greenway, Floral Town",
-        totalRooms: 40,
-        numberOfFloors: 6,
-        status: "MAINTENANCE",
-      }
-        ]
-      : [];
+  // Fetch properties directly from database in server component
+  const ownerId = (session.user as any)?.id;
+  let properties = [];
 
+  try {
+    const propertiesData = await prisma.properties.findMany({
+      where: { ownerId },
+      include: {
+        users_properties_receptionistIdTousers: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        floors: {
+          include: {
+            rooms: {
+              orderBy: { roomNumber: 'asc' },
+            },
+          },
+          orderBy: { floorNumber: 'asc' },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    properties = propertiesData.map((property) => ({
+      ...property,
+      receptionist: property.users_properties_receptionistIdTousers,
+      users_properties_receptionistIdTousers: undefined,
+    }));
+  } catch (error) {
+    console.error('Failed to fetch properties:', error);
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -92,7 +67,7 @@ export default async function OwnerPropertiesPage() {
         <main className="flex-1 p-8">
           <div className="mb-8">
             <h1 className="text-4xl font-bold mb-2">Properties</h1>
-            <p className="text-muted-foreground">List of properties you own</p>
+            <p className="text-muted-foreground">Manage your properties</p>
           </div>
 
           {/* Client-side list + form */}

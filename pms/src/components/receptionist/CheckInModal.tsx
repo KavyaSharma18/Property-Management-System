@@ -255,10 +255,13 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 									<Label htmlFor="numberOfGuests">Number of Guests *</Label>
 									<Input
 										id="numberOfGuests"
-										type="number"
-										min="1"
-										value={formData.numberOfGuests}
-										onChange={(e) => handleInputChange("numberOfGuests", parseInt(e.target.value) || 1)}
+										type="text"
+										inputMode="numeric"
+										value={formData.numberOfGuests || ""}
+										onChange={(e) => {
+											const value = e.target.value.replace(/[^0-9]/g, '');
+											handleInputChange("numberOfGuests", value ? parseInt(value) : 1);
+										}}
 										className={errors.numberOfGuests ? "border-red-500" : ""}
 									/>
 									{errors.numberOfGuests && <p className="text-red-500 text-xs mt-1">{errors.numberOfGuests}</p>}

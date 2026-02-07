@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import NextAuthProvider from "@/components/providers/session-provider";
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "Property Management System",
@@ -18,6 +19,7 @@ export default function RootLayout({
         <NextAuthProvider>
           {children}
         </NextAuthProvider>
+        <Toaster position="top-right" richColors closeButton />
       </body>
     </html>
   );

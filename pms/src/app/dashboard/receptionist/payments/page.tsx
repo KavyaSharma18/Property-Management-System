@@ -308,12 +308,14 @@ export default function PaymentsPage() {
 								<Label htmlFor="paymentAmount">Payment Amount *</Label>
 								<Input
 									id="paymentAmount"
-									type="number"
+									type="text"
+									inputMode="decimal"
 									placeholder="Enter amount to pay"
 									value={paymentAmount}
-									onChange={(e) => setPaymentAmount(e.target.value)}
-									min="1"
-									max={selectedPayment.balanceAmount}
+									onChange={(e) => {
+										const value = e.target.value.replace(/[^0-9.]/g, '');
+										setPaymentAmount(value);
+									}}
 								/>
 								<p className="text-xs text-muted-foreground mt-1">Maximum: ₹{selectedPayment.balanceAmount.toLocaleString("en-IN")}</p>
 							</div>

@@ -14,54 +14,44 @@ export async function GET(request: Request) {
 
     const ownerId = (session.user as any)?.id;
 
-    // Get all properties owned by this owner with their receptionists
-    const properties = await prisma.properties.findMany({
-      where: { ownerId },
-      include: {
-        users_properties_receptionistIdTousers: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true,
-            phoneVerified: true,
-            isActive: true,
-            createdAt: true,
+    // Get all active receptionists who are NOT assigned to any property
+    const allReceptionists = await prisma.users.findMany({
+      where: { 
+        role: "RECEPTIONIST",
+        isActive: true,
+        NOT: {
+          properties_properties_receptionistIdTousers: {
+            isNot: null,
           },
         },
       },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        phoneVerified: true,
+        isActive: true,
+        createdAt: true,
+      },
     });
 
-    // Get unique receptionists with their assigned properties
-    const receptionistMap = new Map();
-
-    properties.forEach((property) => {
-      const receptionist = property.users_properties_receptionistIdTousers;
-      if (receptionist) {
-        if (!receptionistMap.has(receptionist.id)) {
-          receptionistMap.set(receptionist.id, {
-            ...receptionist,
-            assignedProperties: [],
-          });
-        }
-        receptionistMap.get(receptionist.id).assignedProperties.push({
-          id: property.id,
-          name: property.name,
-          city: property.city,
-          totalRooms: property.totalRooms,
-        });
-      }
-    });
-
-    const receptionists = Array.from(receptionistMap.values());
+    // Map receptionists
+    const receptionists = allReceptionists.map((receptionist) => ({
+      id: receptionist.id,
+      name: receptionist.name,
+      email: receptionist.email,
+      phone: receptionist.phone,
+      phoneVerified: receptionist.phoneVerified,
+      isActive: receptionist.isActive,
+      createdAt: receptionist.createdAt,
+      assignedProperties: [], // No assignments for unassigned receptionists
+    }));
 
     return NextResponse.json(
       {
         receptionists,
         totalReceptionists: receptionists.length,
-        totalAssignments: properties.filter(
-          (p) => p.users_properties_receptionistIdTousers
-        ).length,
       },
       { status: 200 }
     );

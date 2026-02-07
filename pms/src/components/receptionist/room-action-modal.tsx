@@ -179,9 +179,13 @@ export default function RoomActionModal({
                 <div className="mt-3 flex flex-col sm:flex-row gap-3">
                   <Input
                     placeholder="Enter amount"
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     value={paymentAmount}
-                    onChange={(e) => onPaymentAmountChange(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9.]/g, '');
+                      onPaymentAmountChange(value);
+                    }}
                   />
                   <Button onClick={onAddPayment}>Add Payment</Button>
                 </div>
@@ -195,9 +199,13 @@ export default function RoomActionModal({
               <div className="flex flex-col sm:flex-row gap-3">
                 <Input
                   value={priceDraft}
-                  onChange={(e) => onPriceDraftChange(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9.]/g, '');
+                    onPriceDraftChange(value);
+                  }}
                   placeholder="New price"
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                 />
                 <Button variant="outline" onClick={onUpdatePrice}>
                   Update Price

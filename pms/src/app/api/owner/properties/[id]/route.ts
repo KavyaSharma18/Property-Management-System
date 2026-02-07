@@ -189,7 +189,8 @@ export async function PUT(
       images,
       numberOfFloors, 
       totalRooms, 
-      status 
+      status,
+      floors
     } = body;
 
     // Check if property belongs to owner
@@ -205,6 +206,26 @@ export async function PUT(
         { error: "Property not found" },
         { status: 404 }
       );
+    }
+
+    // Check if name is being changed and if new name already exists
+    if (name && name !== property.name) {
+      const existingProperty = await prisma.properties.findFirst({
+        where: {
+          name,
+          ownerId,
+          NOT: {
+            id: propertyId,
+          },
+        },
+      });
+
+      if (existingProperty) {
+        return NextResponse.json(
+          { error: "You already have a property with this name" },
+          { status: 409 }
+        );
+      }
     }
 
     // Validate totalRooms if being updated
@@ -269,6 +290,49 @@ export async function PUT(
         },
       },
     });
+
+    // Handle floors update if provided
+    if (floors && Array.isArray(floors)) {
+      // Delete existing floors and rooms for this property
+      await prisma.rooms.deleteMany({
+        where: { propertyId },
+      });
+      
+      await prisma.floors.deleteMany({
+        where: { propertyId },
+      });
+
+      // Create new floors and rooms
+      for (const floor of floors) {
+        const createdFloor = await prisma.floors.create({
+          data: {
+            propertyId,
+            floorNumber: floor.floorNumber,
+            floorName: floor.floorName || `Floor ${floor.floorNumber}`,
+            description: floor.description || "",
+          },
+        });
+
+        // Create rooms for this floor
+        if (floor.rooms && floor.rooms.length > 0) {
+          await prisma.rooms.createMany({
+            data: floor.rooms.map((room: any) => ({
+              propertyId,
+              floorId: createdFloor.id,
+              roomNumber: room.roomNumber,
+              roomType: room.roomType,
+              roomCategory: room.roomCategory || "ECONOMY",
+              capacity: room.capacity,
+              pricePerNight: room.pricePerNight,
+              description: room.description || "",
+              amenities: room.amenities ? JSON.stringify(room.amenities) : null,
+              images: room.images ? JSON.stringify(room.images) : null,
+              status: "VACANT",
+            })),
+          });
+        }
+      }
+    }
 
     return NextResponse.json(
       {

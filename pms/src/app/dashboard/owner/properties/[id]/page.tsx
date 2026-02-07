@@ -1,7 +1,8 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import DashboardHeader from "@/components/dashboard/header";
 import Sidebar from "@/components/dashboard/sidebar";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,54 @@ import ManageReceptionistModal from "@/components/owner/manage-receptionist-moda
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import FloorEditorModal from "@/components/owner/floor-editor-modal";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Loader2, AlertCircle } from "lucide-react";
+
+interface Receptionist {
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface Floor {
+  id: string;
+  floorNumber: number;
+  floorName: string;
+  description?: string;
+  _count?: { rooms: number };
+  rooms?: any[];
+}
+
+interface Property {
+  id: string;
+  name: string;
+  address: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  country?: string;
+  description?: string;
+  amenities?: string[];
+  images?: string[];
+  numberOfFloors: number;
+  totalRooms: number;
+  status: string;
+  receptionist: Receptionist | null;
+  floors?: Floor[];
+  rooms?: any[];
+  analytics?: {
+    totalRoomsCapacity: number;
+    actualRoomsCreated: number;
+    roomsRemaining: number;
+    roomCreationProgress: number;
+    occupiedRooms: number;
+    vacantRooms: number;
+    occupancyRate: number;
+    totalOccupants: number;
+    totalRevenue: number;
+    unreadAlerts: number;
+    roomsByType?: any;
+  };
+}
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -20,6 +68,7 @@ export default function PropertyDetail({ params }: Props) {
   //  Unwrap the params Promise using React.use()
   const { id } = use(params);
   const { data: session } = useSession();
+  const router = useRouter();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -27,7 +76,39 @@ export default function PropertyDetail({ params }: Props) {
   const [isFloorsManagerOpen, setIsFloorsManagerOpen] = useState(false);
   const [isFloorModalOpen, setIsFloorModalOpen] = useState(false);
   const [editingFloorIndex, setEditingFloorIndex] = useState<number | null>(null);
-  const [property, setProperty] = useState<any>(null);
+  const [property, setProperty] = useState<Property | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Fetch property data from API
+  useEffect(() => {
+    const fetchProperty = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const res = await fetch(`/api/owner/properties/${id}`);
+        
+        if (!res.ok) {
+          if (res.status === 404) {
+            throw new Error("Property not found");
+          }
+          throw new Error("Failed to fetch property details");
+        }
+
+        const data = await res.json();
+        setProperty(data.property);
+      } catch (err: any) {
+        console.error("Error fetching property:", err);
+        setError(err.message || "Failed to load property");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProperty();
+  }, [id]);
 
   const normalizeFloors = (floors: any[], count: number) => {
     const total = Math.max(1, Number(count) || 1);
@@ -49,139 +130,139 @@ export default function PropertyDetail({ params }: Props) {
 
   // if (!session) redirect("/auth/signin");
 
-  // 🔹 Demo property + metrics data (later comes from backend)
-  const demoProperties: Record<string, any> = {
-    prop_1: {
-      name: "Seaside Retreat",
-      address: "12 Ocean Drive, Beach City",
-      description: "A cozy inn by the sea",
-      receptionist: { id: "rec_1", name: "Alice Johnson" },
-      city: "Beach City",
-      state: "Coastal State",
-      zipCode: "400001",
-      country: "India",
-      amenities: ["WiFi","Sea View","Breakfast"],
-      images: ["/images/seaside1.jpg"],
-      numberOfFloors: 3,
-      status: "ACTIVE",
-      totalRevenue: 320000,
-      visitorsToday: 18,
-      guestsStaying: 42,
-      occupancyRate: 70,
-      totalRooms: 60,
-      alerts: 1,
-    },
-    prop_2: {
-      name: "Mountain View Inn",
-      address: "99 Alpine Rd, Hilltown",
-      description: "Rustic hotel with mountain views",
-      receptionist: null,
-      city: "Hilltown",
-      state: "Highland",
-      zipCode: "110022",
-      country: "India",
-      amenities: ["Hiking","Breakfast"],
-      images: ["/images/mountain1.jpg"],
-      numberOfFloors: 2,
-      status: "ACTIVE",
-      totalRevenue: 210000,
-      visitorsToday: 12,
-      guestsStaying: 30,
-      occupancyRate: 62,
-      totalRooms: 48,
-      alerts: 0,
-    },
-    prop_3: {
-      name: "Lakeside Hotel",
-      address: "7 Lakeview Rd, Waterside",
-      description: "Relaxing hotel overlooking the lake",
-      receptionist: { id: "rec_2", name: "Brian Lee" },
-      city: "Waterside",
-      state: "Lake State",
-      zipCode: "220033",
-      country: "India",
-      amenities: ["Boating","Spa","Breakfast"],
-      images: ["/images/lakeside1.jpg"],
-      numberOfFloors: 4,
-      status: "ACTIVE",
-      totalRevenue: 450000,
-      visitorsToday: 25,
-      guestsStaying: 65,
-      occupancyRate: 82,
-      totalRooms: 80,
-      alerts: 2,
-    },
-    prop_4: {
-      name: "Urban Central Hotel",
-      address: "101 City Plaza, Metropolis",
-      description: "Modern hotel in the city center",
-      receptionist: { id: "rec_3", name: "Carla Gomez" },
-      city: "Metropolis",
-      state: "Central",
-      zipCode: "560001",
-      country: "India",
-      amenities: ["Gym","Conference Rooms","Breakfast"],
-      images: ["/images/urban1.jpg"],
-      numberOfFloors: 10,
-      status: "ACTIVE",
-      totalRevenue: 780000,
-      visitorsToday: 40,
-      guestsStaying: 120,
-      occupancyRate: 90,
-      totalRooms: 140,
-      alerts: 3,
-    },
-    prop_5: {
-      name: "Garden Palace",
-      address: "22 Greenway, Floral Town",
-      description: "Boutique hotel surrounded by gardens",
-      receptionist: null,
-      city: "Floral Town",
-      state: "Garden State",
-      zipCode: "560022",
-      country: "India",
-      amenities: ["WiFi", "Breakfast", "Pool"],
-      images: ["/images/garden1.jpg"],
-      numberOfFloors: 2,
-      status: "INACTIVE",
-      totalRevenue: 150000,
-      visitorsToday: 8,
-      guestsStaying: 20,
-      occupancyRate: 50,
-      totalRooms: 40,
-      alerts: 0,
-    },
-  };
-
-  const currentProperty = property || demoProperties[id];
-
-  const handleAssignReceptionist = (receptionistId: string, receptionistName: string) => {
-    setProperty({
-      ...currentProperty,
-      receptionist: { id: receptionistId, name: receptionistName },
-    });
+  const handleAssignReceptionist = (receptionistId: string, receptionistName: string, receptionistEmail?: string) => {
+    if (property) {
+      setProperty({
+        ...property,
+        receptionist: { id: receptionistId, name: receptionistName, email: receptionistEmail || "" },
+      });
+    }
   };
 
   const handleRemoveReceptionist = () => {
-    setProperty({
-      ...currentProperty,
-      receptionist: null,
-    });
+    if (property) {
+      setProperty({
+        ...property,
+        receptionist: null,
+      });
+    }
   };
 
-  if (!currentProperty) {
+  const handleUpdateProperty = async () => {
+    if (!editDraft) return;
+
+    try {
+      setIsUpdating(true);
+      setError(null);
+
+      const payload = {
+        name: editDraft.name,
+        address: editDraft.address,
+        city: editDraft.city,
+        state: editDraft.state,
+        zipCode: editDraft.zipCode,
+        country: editDraft.country,
+        description: editDraft.description,
+        amenities: Array.isArray(editDraft.amenities) 
+          ? editDraft.amenities 
+          : editDraft.amenities?.split(",").map((s: string) => s.trim()).filter(Boolean) || [],
+        images: Array.isArray(editDraft.images)
+          ? editDraft.images
+          : editDraft.images?.split(",").map((s: string) => s.trim()).filter(Boolean) || [],
+        numberOfFloors: editDraft.numberOfFloors,
+        totalRooms: editDraft.totalRooms,
+        status: editDraft.status,
+      };
+
+      const res = await fetch(`/api/owner/properties/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to update property");
+      }
+
+      const data = await res.json();
+      setProperty(data.property);
+      setIsEditOpen(false);
+      setEditDraft(null);
+      router.refresh();
+    } catch (err: any) {
+      console.error("Error updating property:", err);
+      setError(err.message || "Failed to update property");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-8">
-        <div className="max-w-3xl mx-auto">
-          <Card>
-            <CardContent className="text-center p-6">
-              <h2 className="text-xl font-semibold mb-2">Property not found</h2>
-            </CardContent>
-          </Card>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <DashboardHeader
+          userName={session?.user?.name}
+          userEmail={session?.user?.email}
+          userRole={(session?.user as { role?: string } | undefined)?.role || "OWNER"}
+        />
+        <div className="flex">
+          <Sidebar role="owner" />
+          <main className="flex-1 p-8">
+            <div className="flex items-center justify-center min-h-[400px]">
+              <div className="text-center">
+                <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-primary" />
+                <p className="text-muted-foreground">Loading property details...</p>
+              </div>
+            </div>
+          </main>
         </div>
       </div>
     );
   }
+
+  if (error || !property) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <DashboardHeader
+          userName={session?.user?.name}
+          userEmail={session?.user?.email}
+          userRole={(session?.user as { role?: string } | undefined)?.role || "OWNER"}
+        />
+        <div className="flex">
+          <Sidebar role="owner" />
+          <main className="flex-1 p-8">
+            <div className="max-w-3xl mx-auto">
+              <Card>
+                <CardContent className="text-center p-6">
+                  <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                  <h2 className="text-xl font-semibold mb-2">
+                    {error || "Property not found"}
+                  </h2>
+                  <Button onClick={() => router.push("/dashboard/owner/properties")}>
+                    Back to Properties
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  const analytics = property.analytics || {
+    totalRoomsCapacity: property.totalRooms,
+    actualRoomsCreated: 0,
+    roomsRemaining: property.totalRooms,
+    roomCreationProgress: 0,
+    occupiedRooms: 0,
+    vacantRooms: 0,
+    occupancyRate: 0,
+    totalOccupants: 0,
+    totalRevenue: 0,
+    unreadAlerts: 0,
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -195,33 +276,110 @@ export default function PropertyDetail({ params }: Props) {
         <Sidebar role="owner" />
 
         <main className="flex-1 p-8">
+          {/* Error Banner */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+              </div>
+              <button
+                onClick={() => setError(null)}
+                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
           {/* Property Info */}
           <Card className="mb-8">
             <CardContent>
-              <h1 className="text-3xl font-bold mb-1">{currentProperty.name}</h1>
-              <p className="text-muted-foreground">{currentProperty.address}</p>
-              <p className="mt-4">{currentProperty.description}</p>
+              <h1 className="text-3xl font-bold mb-1">{property.name}</h1>
+              <p className="text-muted-foreground">{property.address}</p>
+              {(property.city || property.state || property.zipCode) && (
+                <p className="text-sm text-muted-foreground">
+                  {property.city}{property.state ? `, ${property.state}` : ""} {property.zipCode || ""}
+                </p>
+              )}
+              {property.description && <p className="mt-4">{property.description}</p>}
 
-              <div className="mt-4">
-                <p className="text-sm text-muted-foreground">Receptionist</p>
-                {currentProperty.receptionist ? (
-                  <p className="font-medium">{currentProperty.receptionist.name} ({currentProperty.receptionist.id})</p>
-                ) : (
-                  <p className="font-medium text-muted-foreground">Not assigned</p>
-                )}
+              <div className="mt-4 grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Receptionist</p>
+                  {property.receptionist ? (
+                    <>
+                      <p className="font-medium">{property.receptionist.name}</p>
+                      <p className="text-sm text-muted-foreground">{property.receptionist.email}</p>
+                    </>
+                  ) : (
+                    <p className="font-medium text-yellow-600">Not assigned</p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Property Status</p>
+                  <p className={`font-medium ${property.status === "ACTIVE" ? "text-green-600" : "text-gray-500"}`}>
+                    {property.status}
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Property Metrics */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <MetricCard label="Total Revenue" value={`₹${currentProperty.totalRevenue.toLocaleString("en-IN")}`} />
-            <MetricCard label="Visitors Today" value={currentProperty.visitorsToday} />
-            <MetricCard label="Guests Staying" value={currentProperty.guestsStaying} />
-            <MetricCard label="Occupancy Rate" value={`${currentProperty.occupancyRate}%`} />
-            <MetricCard label="Total Rooms" value={currentProperty.totalRooms} />
-            <MetricCard label="Alerts / Flags" value={currentProperty.alerts} highlight={currentProperty.alerts > 0} />
+            <MetricCard label="Total Revenue" value={`₹${analytics.totalRevenue.toLocaleString("en-IN")}`} />
+            <MetricCard label="Total Occupants" value={analytics.totalOccupants} />
+            <MetricCard label="Occupancy Rate" value={`${analytics.occupancyRate.toFixed(1)}%`} />
+            <MetricCard 
+              label="Rooms Created" 
+              value={`${analytics.actualRoomsCreated} / ${analytics.totalRoomsCapacity}`} 
+            />
+            <MetricCard label="Occupied Rooms" value={analytics.occupiedRooms} />
+            <MetricCard label="Vacant Rooms" value={analytics.vacantRooms} />
           </div>
+
+          {/* Room Creation Progress */}
+          {analytics.roomCreationProgress < 100 && (
+            <Card className="mt-6">
+              <CardContent>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-medium">Room Creation Progress</h3>
+                  <span className="text-sm text-muted-foreground">
+                    {analytics.roomCreationProgress.toFixed(0)}% Complete
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                  <div
+                    className="bg-primary h-3 rounded-full transition-all"
+                    style={{ width: `${analytics.roomCreationProgress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {analytics.roomsRemaining} rooms remaining to be created by receptionist
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Alerts */}
+          {analytics.unreadAlerts > 0 && (
+            <Card className="mt-6 border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20">
+              <CardContent>
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-yellow-800 dark:text-yellow-200">
+                      {analytics.unreadAlerts} Unread Alert{analytics.unreadAlerts > 1 ? "s" : ""}
+                    </h3>
+                    <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                      You have pending notifications for this property
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Actions */}
           <Card className="mt-8">
@@ -230,23 +388,29 @@ export default function PropertyDetail({ params }: Props) {
               <div className="flex items-center gap-3">
                 <Button
                   onClick={() => setIsModalOpen(true)}
-                  disabled={currentProperty.status === "INACTIVE"}
-                  className={currentProperty.status === "INACTIVE" ? "opacity-50 cursor-not-allowed" : ""}
+                  disabled={property.status === "INACTIVE"}
+                  className={property.status === "INACTIVE" ? "opacity-50 cursor-not-allowed" : ""}
                 >
                   Manage Receptionist
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => {
-                    const floors = normalizeFloors(currentProperty.floors || [], currentProperty.numberOfFloors || 1);
-                    setEditDraft({ ...currentProperty, floors, numberOfFloors: floors.length });
+                    const floors = normalizeFloors(property.floors || [], property.numberOfFloors || 1);
+                    setEditDraft({ 
+                      ...property, 
+                      floors, 
+                      numberOfFloors: floors.length,
+                      amenities: property.amenities?.join(",") || "",
+                      images: property.images?.join(",") || "",
+                    });
                     setIsEditOpen(true);
                   }}
                 >
                   Edit Property
                 </Button>
               </div>
-              {currentProperty.status === "INACTIVE" && (
+              {property.status === "INACTIVE" && (
                 <p className="mt-2 text-sm text-muted-foreground">This property is inactive. Receptionist management is disabled.</p>
               )}
             </CardContent>
@@ -256,8 +420,9 @@ export default function PropertyDetail({ params }: Props) {
           <ManageReceptionistModal 
             isOpen={isModalOpen}
             onClose={() => setIsModalOpen(false)}
-            currentReceptionist={currentProperty.receptionist}
-            propertyName={currentProperty.name}
+            currentReceptionist={property.receptionist}
+            propertyId={property.id}
+            propertyName={property.name}
             onAssignSuccess={handleAssignReceptionist}
             onRemoveSuccess={handleRemoveReceptionist}
           />
@@ -359,8 +524,17 @@ export default function PropertyDetail({ params }: Props) {
                     >
                       Edit Floors
                     </Button>
-                    <Button onClick={() => { setProperty({ ...currentProperty, ...editDraft }); setIsEditOpen(false); }}>Save</Button>
-                    <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+                    <Button onClick={() => { handleUpdateProperty(); }} disabled={isUpdating}>
+                      {isUpdating ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save"
+                      )}
+                    </Button>
+                    <Button variant="outline" onClick={() => { setIsEditOpen(false); setError(null); }} disabled={isUpdating}>Cancel</Button>
                   </div>
                 </CardContent>
               </Card>
