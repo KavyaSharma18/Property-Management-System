@@ -126,13 +126,6 @@ export default function Sidebar({ role }: SidebarProps) {
 						</Button>
 					</>
 				)}
-
-				<Button asChild size="default" variant={isSectionActive("/profile") ? "default" : "ghost"} className="justify-start">
-						<Link href="/profile" className={isSectionActive("/profile") ? "font-semibold" : ""}>
-							<User size={18} className="mr-2" />
-							Profile
-						</Link>
-					</Button>
 				</nav>
 			</CardContent>
 

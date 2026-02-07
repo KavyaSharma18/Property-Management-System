@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ArrowRight, Sun, Moon } from "lucide-react";
+import { ArrowLeft, ArrowRight, Sun, Moon, User } from "lucide-react";
 
 interface DashboardHeaderProps {
   userName?: string | null;
@@ -87,6 +88,12 @@ export default function DashboardHeader({
               <p className="text-sm font-medium">{displayName}</p>
               <p className="text-xs text-muted-foreground">{displayEmail}</p>
             </div>
+
+            <Button asChild type="button" variant="ghost" size="icon" className="p-2">
+              <Link href="/profile">
+                <User size={18} />
+              </Link>
+            </Button>
 
             <Button type="button" variant="ghost" size="icon" onClick={toggleTheme} className="p-2">
               {isDark ? <Sun size={18} /> : <Moon size={18} />}
