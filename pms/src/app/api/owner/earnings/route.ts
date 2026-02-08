@@ -287,16 +287,49 @@ export async function GET(request: Request) {
       0
     );
 
+    // Calculate payment methods breakdown
+    const paymentMethodsMap: any = {};
+    payments.forEach((payment) => {
+      const method = payment.paymentMethod || "Unknown";
+      if (!paymentMethodsMap[method]) {
+        paymentMethodsMap[method] = { amount: 0, count: 0 };
+      }
+      paymentMethodsMap[method].amount += payment.amount;
+      paymentMethodsMap[method].count += 1;
+    });
+
+    // Format properties for summary view
+    const propertiesWithRevenue = properties.map((property) => {
+      const propertyPayments = payments.filter(
+        (p) => p.occupancies.rooms.propertyId === property.id
+      );
+      const revenue = propertyPayments.reduce((sum, p) => sum + p.amount, 0);
+      return {
+        id: property.id,
+        name: property.name,
+        city: property.city,
+        state: property.state,
+        revenue: parseFloat(revenue.toFixed(2)),
+        paymentCount: propertyPayments.length,
+      };
+    });
+
     return NextResponse.json(
       {
-        period: periodLabel,
+        summary: {
+          totalRevenue: parseFloat(grandTotal.toFixed(2)),
+          totalPayments: payments.length,
+          averagePayment: payments.length > 0 ? parseFloat((grandTotal / payments.length).toFixed(2)) : 0,
+          totalProperties: result.length,
+          periodLabel,
+          paymentMethods: paymentMethodsMap,
+        },
+        properties: propertiesWithRevenue,
         dateRange: {
           startDate: startDate.toISOString().split('T')[0],
           endDate: endDate.toISOString().split('T')[0],
         },
-        propertyCount: result.length,
-        grandTotal: parseFloat(grandTotal.toFixed(2)),
-        properties: result,
+        detailedProperties: result,
       },
       { status: 200 }
     );

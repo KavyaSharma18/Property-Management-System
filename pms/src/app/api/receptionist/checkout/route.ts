@@ -84,12 +84,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if payment is complete
-    if ((occupancy.balanceAmount || 0) > 0) {
+    // Calculate payment for actual days stayed (up to today)
+    const checkInTime = new Date(occupancy.checkInTime);
+    const today = new Date();
+    let actualNightsStayed = Math.ceil(
+      (today.getTime() - checkInTime.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    if (actualNightsStayed < 1) actualNightsStayed = 1;
+
+    // Calculate the actual amount to be paid for days stayed
+    const roomRate = occupancy.actualRoomRate || 0;
+    const calculatedTotalAmount = roomRate * actualNightsStayed;
+    const paidAmount = occupancy.paidAmount || 0;
+    const calculatedBalance = calculatedTotalAmount - paidAmount;
+
+    // Check if payment is complete for days actually stayed
+    if (calculatedBalance > 0) {
       return NextResponse.json(
         {
-          error: `Cannot checkout. Balance amount pending: ₹${occupancy.balanceAmount}`,
-          balanceAmount: occupancy.balanceAmount,
+          error: `Cannot checkout. Balance amount pending for ${actualNightsStayed} night(s): ₹${calculatedBalance.toFixed(2)}`,
+          balanceAmount: calculatedBalance,
+          nightsStayed: actualNightsStayed,
+          totalAmount: calculatedTotalAmount,
+          paidAmount: paidAmount,
         },
         { status: 400 }
       );
@@ -97,11 +114,14 @@ export async function POST(req: NextRequest) {
 
     // Perform checkout
     const result = await prisma.$transaction(async (tx) => {
-      // Update occupancy with checkout date
+      // Update occupancy with checkout date and recalculated amounts
       const updatedOccupancy = await tx.occupancies.update({
         where: { id: occupancyId },
         data: {
-          actualCheckOut: new Date(),
+          actualCheckOut: today,
+          expectedCheckOut: today,
+          totalAmount: calculatedTotalAmount,
+          balanceAmount: calculatedBalance,
         },
         include: {
           rooms: true,

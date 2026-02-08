@@ -84,6 +84,21 @@ export async function GET(request: Request) {
                 email: true,
               },
             },
+            occupancy_guests: {
+              where: {
+                isPrimary: true,
+              },
+              include: {
+                guests: {
+                  select: {
+                    id: true,
+                    name: true,
+                    phone: true,
+                    email: true,
+                  },
+                },
+              },
+            },
           },
         },
         users: {
@@ -102,31 +117,36 @@ export async function GET(request: Request) {
     });
 
     // Enrich payment data
-    const enrichedPayments = payments.map((payment) => ({
-      paymentId: payment.id,
-      amount: payment.amount,
-      paymentMethod: payment.paymentMethod,
-      paymentDate: payment.paymentDate,
-      transactionId: payment.transactionId,
-      paidUpToDate: payment.paidUpToDate,
-      notes: payment.notes,
-      property: payment.occupancies.rooms.properties,
-      room: {
-        id: payment.occupancies.rooms.id,
-        roomNumber: payment.occupancies.rooms.roomNumber,
-        roomType: payment.occupancies.rooms.roomType,
-      },
-      guest: payment.occupancies.guests,
-      occupancy: {
-        id: payment.occupancies.id,
-        checkInTime: payment.occupancies.checkInTime,
-        expectedCheckOut: payment.occupancies.expectedCheckOut,
-        actualCheckOut: payment.occupancies.actualCheckOut,
-        totalAmount: payment.occupancies.totalAmount,
-        balanceAmount: payment.occupancies.balanceAmount,
-      },
-      receivedBy: payment.users,
-    }));
+    const enrichedPayments = payments.map((payment) => {
+      // Get the primary guest from occupancy_guests or fallback to the main guest
+      const primaryGuestData = payment.occupancies.occupancy_guests?.[0]?.guests || payment.occupancies.guests;
+      
+      return {
+        paymentId: payment.id,
+        amount: payment.amount,
+        paymentMethod: payment.paymentMethod,
+        paymentDate: payment.paymentDate,
+        transactionId: payment.transactionId,
+        paidUpToDate: payment.paidUpToDate,
+        notes: payment.notes,
+        property: payment.occupancies.rooms.properties,
+        room: {
+          id: payment.occupancies.rooms.id,
+          roomNumber: payment.occupancies.rooms.roomNumber,
+          roomType: payment.occupancies.rooms.roomType,
+        },
+        guest: primaryGuestData,
+        occupancy: {
+          id: payment.occupancies.id,
+          checkInTime: payment.occupancies.checkInTime,
+          expectedCheckOut: payment.occupancies.expectedCheckOut,
+          actualCheckOut: payment.occupancies.actualCheckOut,
+          totalAmount: payment.occupancies.totalAmount,
+          balanceAmount: payment.occupancies.balanceAmount,
+        },
+        receivedBy: payment.users,
+      };
+    });
 
     // Calculate statistics
     const stats = {

@@ -9,7 +9,7 @@ interface Room {
 	id: number;
 	number: string;
 	type: string;
-	status: "occupied" | "vacant" | "maintenance";
+	status: "occupied" | "vacant" | "maintenance" | "dirty" | "cleaning";
 	capacity: number;
 	pricePerNight: number;
 	guests: number;
@@ -33,6 +33,8 @@ interface CheckInData {
 	numberOfGuests: number;
 	idProofType: string;
 	idProofNumber: string;
+	pricePerNight: number;
+	advancePayment?: number;
 	corporateBooking?: CorporateBookingData;
 }
 
@@ -48,11 +50,13 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 		guestName: "",
 		guestEmail: "",
 		guestPhone: "",
-		paymentMethod: "cash",
+		paymentMethod: "CASH",
 		checkOutDate: "",
 		numberOfGuests: 1,
 		idProofType: "",
 		idProofNumber: "",
+		pricePerNight: room?.pricePerNight || 0,
+		advancePayment: undefined,
 	});
 
 	const [errors, setErrors] = useState<Partial<Record<keyof CheckInData, string>>>({});
@@ -65,7 +69,7 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 		e.stopPropagation();
 	};
 
-	const handleInputChange = (field: keyof CheckInData, value: string | number) => {
+	const handleInputChange = (field: keyof CheckInData, value: string | number | undefined) => {
 		setFormData(prev => ({ ...prev, [field]: value }));
 		// Clear error when user starts typing
 		if (errors[field]) {
@@ -73,7 +77,7 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 		}
 		
 		// Open corporate booking modal when corporate payment is selected
-		if (field === "paymentMethod" && value === "corporate") {
+		if (field === "paymentMethod" && value === "CORPORATE") {
 			setShowCorporateModal(true);
 		}
 	};
@@ -118,7 +122,7 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 		e.preventDefault();
 		
 		// Check if corporate payment is selected but no corporate data
-		if (formData.paymentMethod === "corporate" && !corporateData) {
+		if (formData.paymentMethod === "CORPORATE" && !corporateData) {
 			setShowCorporateModal(true);
 			return;
 		}
@@ -134,11 +138,13 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 				guestName: "",
 				guestEmail: "",
 				guestPhone: "",
-				paymentMethod: "cash",
+				paymentMethod: "CASH",
 				checkOutDate: "",
 				numberOfGuests: 1,
 				idProofType: "",
 				idProofNumber: "",
+				pricePerNight: room?.pricePerNight || 0,
+				advancePayment: undefined,
 			});
 			setErrors({});
 			setCorporateData(null);
@@ -150,11 +156,13 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 			guestName: "",
 			guestEmail: "",
 			guestPhone: "",
-			paymentMethod: "cash",
+			paymentMethod: "CASH",
 			checkOutDate: "",
 			numberOfGuests: 1,
 			idProofType: "",
 			idProofNumber: "",
+			pricePerNight: room?.pricePerNight || 0,
+			advancePayment: undefined,
 		});
 		setErrors({});
 		setCorporateData(null);
@@ -164,7 +172,6 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 	return (
 		<div 
 			className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-			onClick={handleClose}
 		>
 			<div 
 				className="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden max-h-[90vh] overflow-y-auto"
@@ -255,18 +262,40 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 									<Label htmlFor="numberOfGuests">Number of Guests *</Label>
 									<Input
 										id="numberOfGuests"
-										type="text"
-										inputMode="numeric"
-										value={formData.numberOfGuests || ""}
+										type="number"
+										min="1"
+										value={formData.numberOfGuests}
 										onChange={(e) => {
-											const value = e.target.value.replace(/[^0-9]/g, '');
-											handleInputChange("numberOfGuests", value ? parseInt(value) : 1);
+											const value = e.target.value === "" ? "" : parseInt(e.target.value) || 1;
+											handleInputChange("numberOfGuests", value);
+										}}
+										onBlur={(e) => {
+											if (e.target.value === "" || parseInt(e.target.value) < 1) {
+												handleInputChange("numberOfGuests", 1);
+											}
 										}}
 										className={errors.numberOfGuests ? "border-red-500" : ""}
 									/>
 									{errors.numberOfGuests && <p className="text-red-500 text-xs mt-1">{errors.numberOfGuests}</p>}
 								</div>
 
+								<div>
+									<Label htmlFor="advancePayment">Advance Payment (Optional)</Label>
+									<Input
+										id="advancePayment"
+										type="text"
+										inputMode="decimal"
+										placeholder="Enter advance amount"
+										value={formData.advancePayment || ""}
+										onChange={(e) => {
+											const value = e.target.value.replace(/[^0-9.]/g, '');
+											handleInputChange("advancePayment", value ? parseFloat(value) : undefined);
+										}}
+									/>
+								</div>
+							</div>
+
+							<div className="grid grid-cols-1 gap-4">
 								<div>
 									<Label htmlFor="paymentMethod">Payment Method *</Label>
 									<select
@@ -275,14 +304,14 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 										onChange={(e) => handleInputChange("paymentMethod", e.target.value)}
 										className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 									>
-										<option value="cash">Cash</option>
-										<option value="credit_card">Credit Card</option>
-										<option value="debit_card">Debit Card</option>
-										<option value="upi">UPI</option>
-										<option value="bank_transfer">Bank Transfer</option>
-										<option value="aggregator">Aggregator</option>
-										<option value="corporate">Corporate</option>
-									</select>								{formData.paymentMethod === "corporate" && corporateData && (
+										<option value="CASH">Cash</option>
+										<option value="CARD">Card</option>
+										<option value="UPI">UPI</option>
+										<option value="BANK_TRANSFER">Bank Transfer</option>
+										<option value="CHEQUE">Cheque</option>
+										<option value="CORPORATE">Corporate</option>
+									</select>
+								{formData.paymentMethod === "CORPORATE" && corporateData && (
 									<div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-sm text-green-700">
 										✓ Corporate details added: {corporateData.companyName}
 										<button
@@ -338,7 +367,7 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 							<div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
 								<div className="flex justify-between items-center">
 									<span className="text-sm text-muted-foreground">Price per night:</span>
-									<span className="font-semibold">${room.pricePerNight}</span>
+									<span className="font-semibold">₹{room.pricePerNight}</span>
 								</div>
 								{formData.checkOutDate && (() => {
 									const today = new Date().toISOString().split("T")[0];
@@ -360,7 +389,7 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 										<div className="flex justify-between items-center mt-2 pt-2 border-t">
 											<span className="font-semibold">Total Amount:</span>
 											<span className="text-xl font-bold text-blue-600">
-												${room.pricePerNight * nights}
+												₹{room.pricePerNight * nights}
 											</span>
 										</div>
 									</>

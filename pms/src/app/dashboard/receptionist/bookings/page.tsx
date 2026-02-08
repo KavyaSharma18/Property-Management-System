@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import DashboardHeader from "@/components/dashboard/header";
 import Sidebar from "@/components/dashboard/sidebar";
@@ -12,6 +12,7 @@ import BookingEditModal from "@/components/receptionist/booking-edit-modal";
 
 interface Booking {
   id: string;
+  occupancyId: string;
   guestName: string;
   idProofType: string;
   idProofNumber: string;
@@ -19,36 +20,6 @@ interface Booking {
   checkInDate: string;
   checkOutDate: string;
 }
-
-const MOCK_BOOKINGS: Booking[] = [
-  {
-    id: "BK-2026-0001",
-    guestName: "Sundar Sharma",
-    idProofType: "AADHAR",
-    idProofNumber: "XXXX-1234",
-    rooms: ["G01", "202"],
-    checkInDate: "2026-02-02",
-    checkOutDate: "2026-02-05",
-  },
-  {
-    id: "BK-2026-0002",
-    guestName: "Aarav Patel",
-    idProofType: "PASSPORT",
-    idProofNumber: "P1234567",
-    rooms: ["101"],
-    checkInDate: "2026-02-01",
-    checkOutDate: "2026-02-04",
-  },
-  {
-    id: "BK-2026-0003",
-    guestName: "Nisha Rao",
-    idProofType: "DRIVING_LICENSE",
-    idProofNumber: "DL-9988",
-    rooms: ["201"],
-    checkInDate: "2026-02-03",
-    checkOutDate: "2026-02-06",
-  },
-];
 
 const calculateDays = (checkInDate: string, checkOutDate: string) => {
   const checkIn = new Date(checkInDate);
@@ -62,10 +33,54 @@ export default function ManageBookingsPage() {
   const userRole = (rawRole === "owner" ? "owner" : "receptionist") as "owner" | "receptionist";
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [bookings, setBookings] = useState<Booking[]>(MOCK_BOOKINGS);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [editRooms, setEditRooms] = useState("");
   const [editCheckOutDate, setEditCheckOutDate] = useState("");
+
+  // Fetch active occupancies from API
+  useEffect(() => {
+    async function fetchBookings() {
+      try {
+        setIsLoading(true);
+        const response = await fetch("/api/receptionist/occupancies?status=active");
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          console.error("API Error:", response.status, errorData);
+          throw new Error(`Failed to fetch bookings: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log("Fetched bookings data:", data);
+        
+        // Transform occupancies to bookings format
+        const transformedBookings: Booking[] = (data.occupancies || []).map((occ: any) => {
+          const primaryGuest = occ.primaryGuest || occ.guests?.[0];
+          return {
+            id: `BK-${occ.id}`,
+            occupancyId: occ.id,
+            guestName: primaryGuest?.name || "Unknown Guest",
+            idProofType: primaryGuest?.idProofType || "N/A",
+            idProofNumber: primaryGuest?.idProofNumber || "N/A",
+            rooms: [occ.room?.roomNumber || "N/A"],
+            checkInDate: occ.checkInDate ? new Date(occ.checkInDate).toISOString().split('T')[0] : "",
+            checkOutDate: occ.expectedCheckOut ? new Date(occ.expectedCheckOut).toISOString().split('T')[0] : "",
+          };
+        });
+        
+        setBookings(transformedBookings);
+      } catch (error) {
+        console.error("Error fetching bookings:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    if (session?.user) {
+      fetchBookings();
+    }
+  }, [session]);
 
   const selectedBooking = selectedBookingId
     ? bookings.find((booking) => booking.id === selectedBookingId) || null
@@ -93,25 +108,60 @@ export default function ManageBookingsPage() {
     setSelectedBookingId(null);
   };
 
-  const handleSaveBooking = () => {
+  const handleSaveBooking = async () => {
     if (!selectedBooking) return;
-    const rooms = editRooms
-      .split(",")
-      .map((room) => room.trim())
-      .filter(Boolean);
+    
+    if (!editCheckOutDate) {
+      alert("Please select a checkout date");
+      return;
+    }
+    
+    try {
+      console.log("Updating booking:", selectedBooking.occupancyId, editCheckOutDate);
+      const response = await fetch(`/api/receptionist/occupancies/${selectedBooking.occupancyId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expectedCheckOut: new Date(editCheckOutDate).toISOString(),
+        }),
+      });
 
-    setBookings((prev) =>
-      prev.map((booking) =>
-        booking.id === selectedBooking.id
-          ? {
-              ...booking,
-              rooms: rooms.length ? rooms : booking.rooms,
-              checkOutDate: editCheckOutDate || booking.checkOutDate,
-            }
-          : booking
-      )
-    );
-    closeEditModal();
+      console.log("Response status:", response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
+        let errorMessage = "Failed to update booking";
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
+      console.log("Update successful:", result);
+
+      // Update local state
+      setBookings((prev) =>
+        prev.map((booking) =>
+          booking.id === selectedBooking.id
+            ? {
+                ...booking,
+                checkOutDate: editCheckOutDate,
+              }
+            : booking
+        )
+      );
+      
+      alert("Booking updated successfully!");
+      closeEditModal();
+    } catch (error) {
+      console.error("Update booking error:", error);
+      alert(error instanceof Error ? error.message : "Failed to update booking");
+    }
   };
 
   return (
@@ -141,6 +191,16 @@ export default function ManageBookingsPage() {
             </div>
           </div>
 
+          {isLoading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-gray-100 mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading bookings...</p>
+            </div>
+          ) : filteredBookings.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground text-lg">No active bookings found</p>
+            </div>
+          ) : (
           <div className="grid gap-4">
             {filteredBookings.map((booking) => (
               <Card key={booking.id}>
@@ -177,6 +237,7 @@ export default function ManageBookingsPage() {
               </Card>
             ))}
           </div>
+            )}
         </div>
       </div>
 

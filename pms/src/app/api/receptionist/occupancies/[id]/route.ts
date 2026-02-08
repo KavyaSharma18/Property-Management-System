@@ -163,6 +163,8 @@ export async function PUT(
         actualCheckOut: true,
         checkInTime: true,
         paidAmount: true,
+        actualRoomRate: true,
+        expectedCheckOut: true,
       },
     });
 
@@ -220,6 +222,22 @@ export async function PUT(
         }
 
         updateData.expectedCheckOut = checkOutDate;
+        
+        // Recalculate total amount based on new checkout date
+        const checkIn = new Date(occupancy.checkInTime);
+        let nights = Math.ceil(
+          (checkOutDate.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)
+        );
+        if (nights < 1) nights = 1;
+
+        // Get the current room rate from the occupancy
+        const roomRate = actualRoomRate !== undefined ? actualRoomRate : (occupancy.actualRoomRate || 0);
+        
+        if (roomRate > 0) {
+          const newTotalAmount = roomRate * nights;
+          updateData.totalAmount = newTotalAmount;
+          updateData.balanceAmount = newTotalAmount - (occupancy.paidAmount || 0);
+        }
       } else {
         updateData.expectedCheckOut = null;
       }
@@ -233,7 +251,7 @@ export async function PUT(
       const checkIn = new Date(occupancy.checkInTime);
       const checkOut = expectedCheckOut
         ? new Date(expectedCheckOut)
-        : updateData.expectedCheckOut || new Date();
+        : occupancy.expectedCheckOut || new Date();
 
       nights = Math.ceil(
         (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)
@@ -271,8 +289,12 @@ export async function PUT(
     });
   } catch (error) {
     console.error("Occupancy update error:", error);
+    console.error("Error details:", error instanceof Error ? error.message : String(error));
     return NextResponse.json(
-      { error: "Failed to update occupancy" },
+      { 
+        error: "Failed to update occupancy",
+        details: error instanceof Error ? error.message : String(error)
+      },
       { status: 500 }
     );
   }

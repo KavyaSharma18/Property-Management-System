@@ -24,81 +24,87 @@ interface Payment {
 	lastPaidDate?: string;
 }
 
-// Mock data
-const MOCK_PAYMENTS: Payment[] = [
-	{
-		id: "1",
-		bookingId: "BK001",
-		roomNumber: "101",
-		guestName: "Rajesh Kumar",
-		totalAmount: 15000,
-		paidAmount: 0,
-		balanceAmount: 15000,
-		status: "pending",
-		checkInDate: "2026-02-01",
-		expectedCheckOut: "2026-02-10",
-	},
-	{
-		id: "2",
-		bookingId: "BK002",
-		roomNumber: "102",
-		guestName: "Priya Sharma",
-		totalAmount: 12000,
-		paidAmount: 5000,
-		balanceAmount: 7000,
-		status: "pending",
-		checkInDate: "2026-02-03",
-		expectedCheckOut: "2026-02-08",
-		lastPaidDate: "2026-02-03",
-	},
-	{
-		id: "3",
-		bookingId: "BK003",
-		roomNumber: "201",
-		guestName: "Amit Patel",
-		totalAmount: 20000,
-		paidAmount: 20000,
-		balanceAmount: 0,
-		status: "completed",
-		checkInDate: "2026-02-01",
-		expectedCheckOut: "2026-02-05",
-		lastPaidDate: "2026-02-05",
-	},
-	{
-		id: "4",
-		bookingId: "BK004",
-		roomNumber: "103",
-		guestName: "Sneha Reddy",
-		totalAmount: 8000,
-		paidAmount: 3000,
-		balanceAmount: 5000,
-		status: "pending",
-		checkInDate: "2026-02-04",
-		expectedCheckOut: "2026-02-07",
-		lastPaidDate: "2026-02-04",
-	},
-	{
-		id: "5",
-		bookingId: "BK005",
-		roomNumber: "202",
-		guestName: "Vikram Singh",
-		totalAmount: 18000,
-		paidAmount: 0,
-		balanceAmount: 18000,
-		status: "pending",
-		checkInDate: "2026-02-02",
-		expectedCheckOut: "2026-02-09",
-	},
-];
-
 export default function PaymentsPage() {
 	const { data: session } = useSession();
-	const [payments, setPayments] = useState<Payment[]>(MOCK_PAYMENTS);
+	const [payments, setPayments] = useState<Payment[]>([]);
+	const [isLoading, setIsLoading] = useState(true);
 	const [searchTerm, setSearchTerm] = useState("");
 	const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "completed">("all");
 	const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
 	const [paymentAmount, setPaymentAmount] = useState("");
 	const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+
+	// Fetch payments from API
+	const fetchPayments = async () => {
+		try {
+			setIsLoading(true);
+			const response = await fetch("/api/receptionist/occupancies?status=active");
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				console.error("API Error:", response.status, errorData);
+				throw new Error(`Failed to fetch payments: ${response.status}`);
+			}
+			
+			const data = await response.json();
+			console.log("Fetched data:", data);
+			
+			// Transform occupancies to payment format
+			const transformedPayments: Payment[] = (data.occupancies || []).map((occ: any) => {
+				const primaryGuest = occ.primaryGuest || occ.guests?.[0];
+				const status = occ.balanceAmount === 0 ? "completed" : "pending";
+				return {
+					id: String(occ.id),
+					bookingId: `BK-${occ.id}`,
+					roomNumber: occ.room?.roomNumber || "N/A",
+					guestName: primaryGuest?.name || "Unknown Guest",
+					totalAmount: occ.totalAmount || 0,
+					paidAmount: occ.paidAmount || 0,
+					balanceAmount: occ.balanceAmount || 0,
+					status,
+					checkInDate: occ.checkInDate ? new Date(occ.checkInDate).toISOString().split('T')[0] : "",
+					expectedCheckOut: occ.expectedCheckOut ? new Date(occ.expectedCheckOut).toISOString().split('T')[0] : "",
+					lastPaidDate: occ.lastPaidDate ? new Date(occ.lastPaidDate).toISOString().split('T')[0] : undefined,
+				};
+			});
+			
+			setPayments(transformedPayments);
+		} catch (error) {
+			console.error("Error fetching payments:", error);
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	useEffect(() => {
+		if (session?.user) {
+			fetchPayments();
+		}
+	}, [session]);
+
+	// Auto-refresh when page becomes visible
+	useEffect(() => {
+		const handleVisibilityChange = () => {
+			if (!document.hidden && session?.user) {
+				fetchPayments();
+			}
+		};
+
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+		
+		// Also refresh when window gains focus
+		const handleFocus = () => {
+			if (session?.user) {
+				fetchPayments();
+			}
+		};
+		
+		window.addEventListener('focus', handleFocus);
+
+		return () => {
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
+			window.removeEventListener('focus', handleFocus);
+		};
+	}, [session]);
 
 	const filteredPayments = payments.filter((payment) => {
 		const matchesSearch =
@@ -109,31 +115,42 @@ export default function PaymentsPage() {
 		return matchesSearch && matchesStatus;
 	});
 
-	const handleAddPayment = () => {
+	const handleAddPayment = async () => {
 		if (!selectedPayment) return;
 		const amount = Number(paymentAmount);
 		if (!amount || amount <= 0 || amount > selectedPayment.balanceAmount) return;
 
-		setPayments((prev) =>
-			prev.map((payment) => {
-				if (payment.id === selectedPayment.id) {
-					const newPaidAmount = payment.paidAmount + amount;
-					const newBalanceAmount = payment.totalAmount - newPaidAmount;
-					return {
-						...payment,
-						paidAmount: newPaidAmount,
-						balanceAmount: newBalanceAmount,
-						status: newBalanceAmount === 0 ? "completed" : "pending",
-						lastPaidDate: new Date().toISOString().split("T")[0],
-					};
-				}
-				return payment;
-			})
-		);
+		try {
+			const response = await fetch("/api/receptionist/payments", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					occupancyId: selectedPayment.id,
+					amount,
+					paymentMethod: "CASH", // Default method, could be made selectable
+					notes: `Payment received for booking ${selectedPayment.bookingId}`,
+				}),
+			});
 
-		setPaymentAmount("");
-		setIsPaymentModalOpen(false);
-		setSelectedPayment(null);
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({}));
+				throw new Error(errorData.error || "Failed to record payment");
+			}
+
+			const data = await response.json();
+
+			// Refresh the payments list to get updated amounts
+			await fetchPayments();
+
+			setPaymentAmount("");
+			setIsPaymentModalOpen(false);
+			setSelectedPayment(null);
+		} catch (error) {
+			console.error("Error recording payment:", error);
+			alert(error instanceof Error ? error.message : "Failed to record payment. Please try again.");
+		}
 	};
 
 	const openPaymentModal = (payment: Payment) => {
@@ -211,11 +228,18 @@ export default function PaymentsPage() {
 							</Button>
 							<Button variant={statusFilter === "completed" ? "default" : "outline"} onClick={() => setStatusFilter("completed")}>
 								Completed
-							</Button>
-						</div>
+							</Button>						<Button variant="outline" onClick={fetchPayments} disabled={isLoading}>
+							{isLoading ? "Refreshing..." : "Refresh"}
+						</Button>						</div>
 					</div>
 
 					{/* Payments Table */}
+					{isLoading ? (
+						<div className="text-center py-12">
+							<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-gray-100 mx-auto mb-4"></div>
+							<p className="text-muted-foreground">Loading payments...</p>
+						</div>
+					) : (
 					<Card className="bg-white dark:bg-gray-800">
 						<div className="overflow-x-auto">
 							<table className="w-full">
@@ -267,6 +291,7 @@ export default function PaymentsPage() {
 							</div>
 						)}
 					</Card>
+					)}
 				</div>
 			</div>
 

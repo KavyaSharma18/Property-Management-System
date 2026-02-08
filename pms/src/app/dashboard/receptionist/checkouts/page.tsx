@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import DashboardHeader from "@/components/dashboard/header";
 import Sidebar from "@/components/dashboard/sidebar";
@@ -15,82 +15,53 @@ interface Checkout {
   balanceAmount: number;
 }
 
-const MOCK_CHECKOUTS: Checkout[] = [
-  {
-    id: "BK-2026-0001",
-    guestName: "Sundar Sharma",
-    roomNumber: "G01",
-    expectedCheckOutDate: "2026-02-04",
-    expectedCheckOutTime: "11:00 AM",
-    balanceAmount: 0,
-  },
-  {
-    id: "BK-2026-0003",
-    guestName: "Nisha Rao",
-    roomNumber: "201",
-    expectedCheckOutDate: "2026-02-04",
-    expectedCheckOutTime: "10:30 AM",
-    balanceAmount: 1200,
-  },
-  {
-    id: "BK-2026-0005",
-    guestName: "Rahul Mehta",
-    roomNumber: "102",
-    expectedCheckOutDate: "2026-02-05",
-    expectedCheckOutTime: "12:00 PM",
-    balanceAmount: 2500,
-  },
-  {
-    id: "BK-2026-0007",
-    guestName: "Priya Verma",
-    roomNumber: "G03",
-    expectedCheckOutDate: "2026-02-05",
-    expectedCheckOutTime: "11:00 AM",
-    balanceAmount: 0,
-  },
-  {
-    id: "BK-2026-0009",
-    guestName: "Amit Kumar",
-    roomNumber: "203",
-    expectedCheckOutDate: "2026-02-06",
-    expectedCheckOutTime: "10:00 AM",
-    balanceAmount: 800,
-  },
-  {
-    id: "BK-2026-0011",
-    guestName: "Kavita Singh",
-    roomNumber: "F01",
-    expectedCheckOutDate: "2026-02-06",
-    expectedCheckOutTime: "11:30 AM",
-    balanceAmount: 0,
-  },
-  {
-    id: "BK-2026-0013",
-    guestName: "Rajesh Patel",
-    roomNumber: "105",
-    expectedCheckOutDate: "2026-02-07",
-    expectedCheckOutTime: "12:00 PM",
-    balanceAmount: 3200,
-  },
-  {
-    id: "BK-2026-0015",
-    guestName: "Sneha Desai",
-    roomNumber: "301",
-    expectedCheckOutDate: "2026-02-08",
-    expectedCheckOutTime: "11:00 AM",
-    balanceAmount: 0,
-  },
-];
-
 export default function ReceptionistCheckoutsPage() {
   const { data: session } = useSession();
   const rawRole = (session?.user as { role?: string } | undefined)?.role;
   const userRole = (rawRole === "owner" ? "owner" : "receptionist") as "owner" | "receptionist";
+  const [checkouts, setCheckouts] = useState<Checkout[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch upcoming checkouts from API
+  useEffect(() => {
+    async function fetchCheckouts() {
+      try {
+        setIsLoading(true);
+        const response = await fetch("/api/receptionist/checkouts/upcoming?period=week");
+        if (!response.ok) throw new Error("Failed to fetch checkouts");
+        
+        const data = await response.json();
+        
+        // Transform API data to checkout format
+        const transformedCheckouts: Checkout[] = data.checkouts.map((checkout: any) => {
+          const expectedDate = checkout.expectedCheckOut ? new Date(checkout.expectedCheckOut) : new Date();
+          return {
+            id: `BK-${checkout.occupancyId}`,
+            guestName: checkout.primaryGuest?.name || "Unknown Guest",
+            roomNumber: checkout.room?.roomNumber || "N/A",
+            expectedCheckOutDate: expectedDate.toISOString().split('T')[0],
+            expectedCheckOutTime: expectedDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+            balanceAmount: checkout.balanceAmount || 0,
+          };
+        });
+        
+        setCheckouts(transformedCheckouts);
+      } catch (error) {
+        console.error("Error fetching checkouts:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    if (session?.user) {
+      fetchCheckouts();
+    }
+  }, [session]);
 
   const today = new Date().toISOString().split("T")[0];
   const upcomingCheckouts = useMemo(
-    () => MOCK_CHECKOUTS.filter((checkout) => checkout.expectedCheckOutDate > today),
-    [today]
+    () => checkouts.filter((checkout) => checkout.expectedCheckOutDate >= today),
+    [checkouts, today]
   );
 
   return (
@@ -104,10 +75,20 @@ export default function ReceptionistCheckoutsPage() {
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-2">Upcoming Checkouts</h1>
             <p className="text-muted-foreground">
-              Demo data. Will be fetched from database later.
+              Manage upcoming guest checkouts and ensure timely payments.
             </p>
           </div>
 
+          {isLoading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-gray-100 mx-auto mb-4"></div>
+              <p className="text-muted-foreground">Loading checkouts...</p>
+            </div>
+          ) : upcomingCheckouts.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground text-lg">No upcoming checkouts</p>
+            </div>
+          ) : (
           <div className="grid gap-4">
             {upcomingCheckouts.map((checkout) => (
               <Card key={checkout.id}>
@@ -136,13 +117,8 @@ export default function ReceptionistCheckoutsPage() {
                 </CardContent>
               </Card>
             ))}
-
-            {upcomingCheckouts.length === 0 && (
-              <div className="text-center text-muted-foreground py-12">
-                No upcoming checkouts.
-              </div>
-            )}
           </div>
+          )}
         </div>
       </div>
     </div>

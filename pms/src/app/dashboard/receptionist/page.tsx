@@ -5,6 +5,7 @@ import DashboardHeader from "@/components/dashboard/header";
 import Sidebar from "@/components/dashboard/sidebar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Users, DoorOpen, DoorClosed, TrendingUp } from "lucide-react";
+import prisma from "@/lib/prisma";
 
 export default async function ReceptionistDashboard() {
   const session = await getServerSession(authOptions);
@@ -13,46 +14,92 @@ export default async function ReceptionistDashboard() {
     redirect("/auth/signin");
   }
 
-  // const session =
-  // process.env.NODE_ENV === "development"
-  //   ? {
-  //       user: {
-  //         name: "Demo User",
-  //         email: "demo@pms.com",
-  //         role: "RECEPTIONIST", 
-  //       },
-  //     }
-  //   : await getServerSession(authOptions);
-
-  //   if (!session) {
-  //     redirect("/auth/signin");
-  //   }
-
-
   // Check if user is receptionist
   if ((session.user as any).role !== "RECEPTIONIST") {
     redirect("/dashboard/owner");
   }
 
-  // Mock property data - In real app, fetch based on receptionist's assigned property
-  // For demo, assuming receptionist is assigned to "Seaside Retreat"
-  const assignedProperty = {
-    id: "prop_1",
-    name: "Seaside Retreat",
-    address: "12 Ocean Drive, Beach City",
-    totalRooms: 60,
-    vacantRooms: 18,
-    occupiedRooms: 42,
-    totalGuests: 85,
-    occupancyRate: 70,
-  };
+  const userId = (session.user as any)?.id;
 
-  const availableByCategory = [
-    { label: "Suite", available: 4 },
-    { label: "Deluxe", available: 6 },
-    { label: "AC Room", available: 5 },
-    { label: "Non-AC Room", available: 3 },
-  ];
+  // Get receptionist's assigned property
+  const receptionist = await prisma.users.findUnique({
+    where: { id: userId },
+    select: {
+      propertyId: true,
+      properties_properties_receptionistIdTousers: {
+        select: {
+          id: true,
+          name: true,
+          address: true,
+        },
+      },
+    },
+  });
+
+  if (!receptionist?.propertyId || !receptionist.properties_properties_receptionistIdTousers) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <DashboardHeader
+          userName={session.user?.name}
+          userEmail={session.user?.email}
+          userRole="RECEPTIONIST"
+        />
+        <div className="flex">
+          <Sidebar role="receptionist" />
+          <div className="flex-1 p-8">
+            <Card className="p-12 text-center">
+              <h2 className="text-2xl font-bold mb-4">No Property Assigned</h2>
+              <p className="text-muted-foreground">
+                You haven't been assigned to any property yet. Please contact your administrator.
+              </p>
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const assignedProperty = receptionist.properties_properties_receptionistIdTousers;
+
+  // Get room statistics
+  const rooms = await prisma.rooms.findMany({
+    where: { propertyId: receptionist.propertyId },
+    select: {
+      id: true,
+      status: true,
+      roomType: true,
+    },
+  });
+
+  const totalRooms = rooms.length;
+  const vacantRooms = rooms.filter(r => r.status === "VACANT").length;
+  const occupiedRooms = rooms.filter(r => r.status === "OCCUPIED").length;
+
+  // Get active occupancies for guest count
+  const activeOccupancies = await prisma.occupancies.count({
+    where: {
+      rooms: {
+        propertyId: receptionist.propertyId,
+      },
+      actualCheckOut: null,
+    },
+  });
+
+  // Calculate occupancy rate
+  const occupancyRate = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0;
+
+  // Get available rooms by type (only vacant)
+  const availableByCategory = rooms
+    .filter(r => r.status === "VACANT")
+    .reduce((acc: any[], room) => {
+      const existing = acc.find(item => item.label === room.roomType);
+      if (existing) {
+        existing.available++;
+      } else {
+        acc.push({ label: room.roomType, available: 1 });
+      }
+      return acc;
+    }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -88,7 +135,7 @@ export default async function ReceptionistDashboard() {
                   <h3 className="font-semibold text-sm">Total Rooms</h3>
                   <DoorOpen className="text-blue-500" size={20} />
                 </div>
-                <p className="text-3xl font-bold">{assignedProperty.totalRooms}</p>
+                <p className="text-3xl font-bold">{totalRooms}</p>
                 <p className="text-sm text-muted-foreground mt-2">in this property</p>
               </CardContent>
             </Card>
@@ -100,7 +147,7 @@ export default async function ReceptionistDashboard() {
                   <h3 className="font-semibold text-sm">Vacant Rooms</h3>
                   <DoorOpen className="text-green-500" size={20} />
                 </div>
-                <p className="text-3xl font-bold text-green-600">{assignedProperty.vacantRooms}</p>
+                <p className="text-3xl font-bold text-green-600">{vacantRooms}</p>
                 <p className="text-sm text-muted-foreground mt-2">Available for booking</p>
               </CardContent>
             </Card>
@@ -112,7 +159,7 @@ export default async function ReceptionistDashboard() {
                   <h3 className="font-semibold text-sm">Occupied Rooms</h3>
                   <DoorClosed className="text-red-500" size={20} />
                 </div>
-                <p className="text-3xl font-bold text-red-600">{assignedProperty.occupiedRooms}</p>
+                <p className="text-3xl font-bold text-red-600">{occupiedRooms}</p>
                 <p className="text-sm text-muted-foreground mt-2">Currently occupied</p>
               </CardContent>
             </Card>
@@ -124,7 +171,7 @@ export default async function ReceptionistDashboard() {
                   <h3 className="font-semibold text-sm">Total Guests</h3>
                   <Users className="text-purple-500" size={20} />
                 </div>
-                <p className="text-3xl font-bold text-purple-600">{assignedProperty.totalGuests}</p>
+                <p className="text-3xl font-bold text-purple-600">{activeOccupancies}</p>
                 <p className="text-sm text-muted-foreground mt-2">Currently staying</p>
               </CardContent>
             </Card>
@@ -141,7 +188,7 @@ export default async function ReceptionistDashboard() {
                 <div className="flex items-center gap-4">
                   <div className="flex flex-col items-center">
                     <TrendingUp className="text-blue-500 mb-2" size={28} />
-                    <p className="text-4xl font-bold text-blue-600">{assignedProperty.occupancyRate}%</p>
+                    <p className="text-4xl font-bold text-blue-600">{occupancyRate}%</p>
                   </div>
                 </div>
               </div>
@@ -149,7 +196,7 @@ export default async function ReceptionistDashboard() {
               <div className="mt-4 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                 <div
                   className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${assignedProperty.occupancyRate}%` }}
+                  style={{ width: `${occupancyRate}%` }}
                 ></div>
               </div>
             </CardContent>
@@ -160,16 +207,22 @@ export default async function ReceptionistDashboard() {
             <CardContent className="p-6">
               <h3 className="font-semibold text-lg mb-4">Available Rooms by Category</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Demo data (vacant rooms only). Will be fetched from database later.
+                Current vacant rooms grouped by category
               </p>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {availableByCategory.map((category) => (
-                  <div key={category.label} className="p-4 rounded-lg border bg-white dark:bg-gray-900">
-                    <p className="text-sm text-muted-foreground">{category.label}</p>
-                    <p className="text-2xl font-bold mt-1">{category.available}</p>
-                    <p className="text-xs text-muted-foreground">available</p>
+                {availableByCategory.length > 0 ? (
+                  availableByCategory.map((category) => (
+                    <div key={category.label} className="p-4 rounded-lg border bg-white dark:bg-gray-900">
+                      <p className="text-sm text-muted-foreground">{category.label}</p>
+                      <p className="text-2xl font-bold mt-1">{category.available}</p>
+                      <p className="text-xs text-muted-foreground">available</p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-full text-center py-4">
+                    <p className="text-sm text-muted-foreground">No vacant rooms available</p>
                   </div>
-                ))}
+                )}
               </div>
             </CardContent>
           </Card>

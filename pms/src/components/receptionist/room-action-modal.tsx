@@ -8,7 +8,7 @@ export interface RoomActionModalRoom {
   id: number;
   number: string;
   type: string;
-  status: "occupied" | "vacant" | "maintenance";
+  status: "occupied" | "vacant" | "maintenance" | "dirty" | "cleaning";
   capacity: number;
   pricePerNight: number;
   guests: number;
@@ -38,6 +38,8 @@ interface RoomActionModalProps {
   onCheckIn: () => void;
   onMarkVacant: () => void;
   onRemoveMaintenance: () => void;
+  onMarkCleaning?: () => void;
+  onMarkVacantFromCleaning?: () => void;
   paymentSummary: PaymentSummary | null;
   nights: number;
   formatDate: (date?: string) => string;
@@ -61,6 +63,8 @@ export default function RoomActionModal({
   onCheckIn,
   onMarkVacant,
   onRemoveMaintenance,
+  onMarkCleaning,
+  onMarkVacantFromCleaning,
   paymentSummary,
   nights,
   formatDate,
@@ -238,7 +242,17 @@ export default function RoomActionModal({
             )}
             {room.status === "occupied" && (
               <Button variant="outline" onClick={onMarkVacant}>
-                Mark Vacant (to Maintenance)
+                Checkout Guest
+              </Button>
+            )}
+            {room.status === "dirty" && onMarkCleaning && (
+              <Button variant="outline" onClick={onMarkCleaning}>
+                Start Cleaning
+              </Button>
+            )}
+            {room.status === "cleaning" && onMarkVacantFromCleaning && (
+              <Button variant="outline" onClick={onMarkVacantFromCleaning}>
+                Mark as Vacant
               </Button>
             )}
             {room.status === "maintenance" && (

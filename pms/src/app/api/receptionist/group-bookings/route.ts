@@ -161,6 +161,17 @@ export async function GET(req: NextRequest) {
       );
       const balanceAmount = totalAmount - paidAmount;
 
+      // Determine status
+      const now = new Date();
+      const checkIn = new Date(gb.checkInDate);
+      const checkOut = new Date(gb.checkOutDate);
+      let status = "upcoming";
+      if (now >= checkOut || completedRooms === gb.totalRooms) {
+        status = "completed";
+      } else if (now >= checkIn) {
+        status = "active";
+      }
+
       const rooms = gb.occupancies.map((occ) => ({
         id: occ.id,
         room: occ.rooms,
@@ -186,9 +197,12 @@ export async function GET(req: NextRequest) {
         createdBy: gb.users,
         createdAt: gb.createdAt,
         property: gb.properties,
+        status,
         activeRooms,
         completedRooms,
         bookedRooms: gb._count.occupancies,
+        roomsBooked: gb._count.occupancies,
+        roomsPending: gb.totalRooms - gb._count.occupancies,
         totalAmount,
         paidAmount,
         balanceAmount,

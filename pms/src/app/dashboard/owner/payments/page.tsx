@@ -726,7 +726,7 @@ export default function PaymentsPage() {
 									</div>
 
 									{/* Property-wise Breakdown */}
-									{revenueData.properties && revenueData.properties.length > 0 && (
+									{revenueData?.properties && Array.isArray(revenueData.properties) && revenueData.properties.length > 0 && (
 										<Card>
 											<CardHeader>
 												<CardTitle>Revenue by Property</CardTitle>
@@ -758,7 +758,7 @@ export default function PaymentsPage() {
 																<div
 																	className="bg-green-600 h-2 rounded-full"
 																	style={{
-																		width: `${((property.revenue / revenueData.summary.totalRevenue) * 100).toFixed(1)}%`
+																		width: `${revenueData?.summary?.totalRevenue ? ((property.revenue / revenueData.summary.totalRevenue) * 100).toFixed(1) : 0}%`
 																	}}
 																/>
 															</div>
@@ -770,7 +770,7 @@ export default function PaymentsPage() {
 									)}
 
 									{/* Payment Methods Breakdown */}
-									{revenueData.summary?.paymentMethods && (
+									{revenueData?.summary?.paymentMethods && Object.keys(revenueData.summary.paymentMethods).length > 0 && (
 										<Card>
 											<CardHeader>
 												<CardTitle>Payment Methods</CardTitle>

@@ -47,7 +47,9 @@ export async function GET(req: NextRequest) {
 
     // Build filter conditions
     const whereConditions: any = {
-      propertyId,
+      rooms: {
+        propertyId: propertyId,
+      },
     };
 
     // Status filter

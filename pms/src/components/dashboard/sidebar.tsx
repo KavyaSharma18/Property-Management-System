@@ -124,15 +124,26 @@ export default function Sidebar({ role }: SidebarProps) {
 								Manage Bookings
 							</Link>
 						</Button>
-					</>
-				)}
-				</nav>
-			</CardContent>
 
-			<div className="p-4 border-t text-sm text-muted-foreground">
-				<div className="font-medium">Signed in</div>
-			</div>
-		</Card>
+				<Button
+					asChild
+					size="default"
+					variant={isSectionActive(`${base}/group-bookings`) ? "default" : "ghost"}
+					className="justify-start"
+				>
+					<Link href={`${base}/group-bookings`} className={isSectionActive(`${base}/group-bookings`) ? "font-semibold" : ""}>
+						<Users size={18} className="mr-2" />
+						Group Bookings
+					</Link>
+				</Button>
+			</>
+		)}
+		</nav>
+	</CardContent>
+
+	<div className="p-4 border-t text-sm text-muted-foreground">
+		<div className="font-medium">Signed in</div>
+	</div>
+</Card>
 	);
 }
-

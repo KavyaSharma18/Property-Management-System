@@ -504,7 +504,7 @@
 
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import DashboardHeader from "@/components/dashboard/header";
 import Sidebar from "@/components/dashboard/sidebar";
@@ -519,7 +519,7 @@ interface Room {
 	id: number;
 	number: string;
 	type: string;
-	status: "occupied" | "vacant" | "maintenance";
+	status: "occupied" | "vacant" | "maintenance" | "dirty" | "cleaning";
 	capacity: number;
 	pricePerNight: number;
 	guests: number;
@@ -528,6 +528,7 @@ interface Room {
 	groupBookingName?: string;
 	paidAmount?: number;
 	bookingId?: string;
+	occupancyId?: string;
 	idProofType?: string;
 	idProofNumber?: string;
 	checkInAt?: string;
@@ -540,139 +541,78 @@ interface Room {
 	paymentMethod?: string;
 }
 
-// Mock room data
-const MOCK_ROOMS: Room[] = [
-	{
-		id: 1,
-		number: "G01",
-		type: "AC Room",
-		status: "occupied",
-		capacity: 1,
-		pricePerNight: 50,
-		guests: 1,
-		floorNumber: 0,
-		isGroupBooking: true,
-		groupBookingName: "Sundar Sharma",
-		paidAmount: 40,
-		bookingId: "BK-2026-0001",
-		idProofType: "AADHAR",
-		idProofNumber: "XXXX-1234",
-		checkInAt: "2026-02-02T10:15:00.000Z",
-		expectedCheckOutDate: "2026-02-05",
-		guestName: "Sundar Sharma",
-		guestEmail: "sundar@example.com",
-		guestPhone: "+91 98765 43210",
-		paymentMethod: "cash",
-	},
-	{
-		id: 2,
-		number: "G02",
-		type: "Non-AC Room",
-		status: "vacant",
-		capacity: 2,
-		pricePerNight: 80,
-		guests: 0,
-		floorNumber: 0,
-	},
-	{
-		id: 3,
-		number: "101",
-		type: "Suite",
-		status: "occupied",
-		capacity: 4,
-		pricePerNight: 150,
-		guests: 3,
-		floorNumber: 1,
-		paidAmount: 150,
-		bookingId: "BK-2026-0002",
-		idProofType: "PASSPORT",
-		idProofNumber: "P1234567",
-		checkInAt: "2026-02-01T13:05:00.000Z",
-		expectedCheckOutDate: "2026-02-04",
-		guestName: "Aarav Patel",
-		guestEmail: "aarav@example.com",
-		guestPhone: "+91 99123 45678",
-		paymentMethod: "upi",
-	},
-	{
-		id: 4,
-		number: "102",
-		type: "Deluxe",
-		status: "vacant",
-		capacity: 2,
-		pricePerNight: 80,
-		guests: 0,
-		floorNumber: 1,
-	},
-	{
-		id: 5,
-		number: "201",
-		type: "AC Room",
-		status: "occupied",
-		capacity: 1,
-		pricePerNight: 50,
-		guests: 1,
-		floorNumber: 2,
-		paidAmount: 0,
-		bookingId: "BK-2026-0003",
-		idProofType: "DRIVING_LICENSE",
-		idProofNumber: "DL-9988",
-		checkInAt: "2026-02-03T09:40:00.000Z",
-		expectedCheckOutDate: "2026-02-06",
-		guestName: "Nisha Rao",
-		guestEmail: "nisha@example.com",
-		guestPhone: "+91 99887 76655",
-		paymentMethod: "credit_card",
-	},
-	{
-		id: 6,
-		number: "202",
-		type: "Non-AC Room",
-		status: "occupied",
-		capacity: 2,
-		pricePerNight: 80,
-		guests: 2,
-		floorNumber: 2,
-		isGroupBooking: true,
-		groupBookingName: "Sundar Sharma",
-		paidAmount: 120,
-		bookingId: "BK-2026-0001",
-		idProofType: "AADHAR",
-		idProofNumber: "XXXX-1234",
-		checkInAt: "2026-02-02T10:18:00.000Z",
-		expectedCheckOutDate: "2026-02-05",
-		guestName: "Neha Sharma",
-		guestEmail: "neha@example.com",
-		guestPhone: "+91 98000 11111",
-		paymentMethod: "upi",
-	},
-	{
-		id: 7,
-		number: "203",
-		type: "Deluxe",
-		status: "maintenance",
-		capacity: 1,
-		pricePerNight: 0,
-		guests: 0,
-		floorNumber: 2,
-	},
-];
-
 export default function RoomsPage() {
 	const { data: session } = useSession();
 	const rawRole = (session?.user as { role?: string } | undefined)?.role;
 	const userRole = (rawRole === "owner" ? "owner" : "receptionist") as "owner" | "receptionist";
-	const [rooms, setRooms] = useState<Room[]>(MOCK_ROOMS);
+	const [rooms, setRooms] = useState<Room[]>([]);
+	const [isLoading, setIsLoading] = useState(true);
 	const [searchTerm, setSearchTerm] = useState("");
 	const [statusFilter, setStatusFilter] = useState<"all" | "occupied" | "vacant" | "maintenance">("all");
 	const [capacityFilter, setCapacityFilter] = useState<"all" | "1" | "2" | "4">("all");
-	const [typeFilter, setTypeFilter] = useState<"all" | "Suite" | "Deluxe" | "AC Room" | "Non-AC Room">("all");
+	const [typeFilter, setTypeFilter] = useState<string>("all");
 	const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
 	const [isCheckInModalOpen, setIsCheckInModalOpen] = useState(false);
 	const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
 	const [paymentAmount, setPaymentAmount] = useState("");
 	const [priceDraft, setPriceDraft] = useState("");
 	const [editCheckOutDate, setEditCheckOutDate] = useState("");
+
+	// Fetch rooms data from API
+	useEffect(() => {
+		async function fetchRooms() {
+			try {
+				setIsLoading(true);
+				const response = await fetch("/api/receptionist/rooms");
+				if (!response.ok) throw new Error("Failed to fetch rooms");
+				
+				const data = await response.json();
+				
+				// Transform API data to match Room interface
+				const transformedRooms: Room[] = data.rooms.map((room: any) => {
+					const occupancy = room.currentOccupancy;
+					const primaryGuest = occupancy?.guests?.[0];
+					
+					// Normalize status to match expected values
+					let normalizedStatus: "occupied" | "vacant" | "maintenance" | "dirty" | "cleaning" = "vacant";
+					if (room.status === "OCCUPIED") normalizedStatus = "occupied";
+					else if (room.status === "MAINTENANCE") normalizedStatus = "maintenance";
+					else if (room.status === "DIRTY") normalizedStatus = "dirty";
+					else if (room.status === "CLEANING") normalizedStatus = "cleaning";
+					else normalizedStatus = "vacant";
+					
+					return {
+						id: room.id,
+						number: room.roomNumber,
+						type: room.type,
+						status: normalizedStatus,
+						capacity: room.capacity,
+						pricePerNight: room.pricePerNight,
+						guests: occupancy?.guestCount || 0,
+						floorNumber: room.floor?.floorNumber || 0,
+						paidAmount: occupancy?.paidAmount || 0,
+						bookingId: occupancy?.id ? `BK-${occupancy.id}` : undefined,
+						occupancyId: occupancy?.id,
+						checkInAt: occupancy?.checkInTime,
+						expectedCheckOutDate: occupancy?.expectedCheckOut,
+						guestName: primaryGuest?.name,
+						guestEmail: primaryGuest?.email,
+						guestPhone: primaryGuest?.phone,
+					};
+				});
+				
+				setRooms(transformedRooms);
+			} catch (error) {
+				console.error("Error fetching rooms:", error);
+			} finally {
+				setIsLoading(false);
+			}
+		}
+
+		if (session?.user) {
+			fetchRooms();
+		}
+	}, [session]);
 
 	const selectedRoom = selectedRoomId
 		? rooms.find((room) => room.id === selectedRoomId) || null
@@ -692,7 +632,7 @@ export default function RoomsPage() {
 	const occupancyDenominator = Math.max(1, rooms.length - maintenanceCount);
 	const occupancyRate = Math.round((occupiedCount / occupancyDenominator) * 100);
 
-	const toggleRoomStatus = (id: number) => {
+	const toggleRoomStatus = async (id: number) => {
 		const room = rooms.find(r => r.id === id);
 		if (!room) return;
 
@@ -701,62 +641,233 @@ export default function RoomsPage() {
 			setSelectedRoomId(room.id);
 			setIsCheckInModalOpen(true);
 		} else if (room.status === "occupied") {
-			// If room is occupied, mark as maintenance and clear guest data
-			const checkoutTimestamp = new Date().toISOString();
-			setRooms((prevRooms) =>
-				prevRooms.map((r) =>
-					r.id === id ? { 
-						...r, 
-						status: "maintenance", 
-						guests: 0,
-						guestName: undefined,
-						guestEmail: undefined,
-						guestPhone: undefined,
-						paymentMethod: undefined,
-						checkInAt: undefined,
-						checkOutAt: checkoutTimestamp,
-						expectedCheckOutDate: undefined,
-						bookingId: undefined,
-						idProofType: undefined,
-						idProofNumber: undefined,
-						paidAmount: 0,
-					} : r
-				)
-			);
+			// If room is occupied, perform checkout with payment validation
+			if (!room.occupancyId) {
+				alert("No active booking found for this room");
+				return;
+			}
+
+			try {
+				const response = await fetch("/api/receptionist/checkout", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ occupancyId: room.occupancyId }),
+				});
+
+				if (!response.ok) {
+					const error = await response.json();
+					if (error.balanceAmount !== undefined) {
+						alert(
+							`Cannot checkout - Payment incomplete!\n\n` +
+							`Nights Stayed: ${error.nightsStayed}\n` +
+							`Total Amount: ₹${error.totalAmount}\n` +
+							`Paid Amount: ₹${error.paidAmount}\n` +
+							`Balance Pending: ₹${error.balanceAmount}\n\n` +
+							`Please collect the pending payment before checkout.`
+						);
+					} else {
+						alert(error.error || "Failed to checkout");
+					}
+					return;
+				}
+
+				const result = await response.json();
+				
+				// Reload rooms data to reflect the checkout
+				setIsLoading(true);
+				const roomsResponse = await fetch("/api/receptionist/rooms");
+				if (roomsResponse.ok) {
+					const data = await roomsResponse.json();
+					const transformedRooms: Room[] = data.rooms.map((room: any) => {
+						const occupancy = room.currentOccupancy;
+						const primaryGuest = occupancy?.guests?.[0];
+						
+						let normalizedStatus: "occupied" | "vacant" | "maintenance" | "dirty" | "cleaning" = "vacant";
+						if (room.status === "OCCUPIED") normalizedStatus = "occupied";
+						else if (room.status === "MAINTENANCE") normalizedStatus = "maintenance";
+						else if (room.status === "DIRTY") normalizedStatus = "dirty";
+						else if (room.status === "CLEANING") normalizedStatus = "cleaning";
+						else normalizedStatus = "vacant";
+						
+						return {
+							id: room.id,
+							number: room.roomNumber,
+							type: room.type,
+							status: normalizedStatus,
+							capacity: room.capacity,
+							pricePerNight: room.pricePerNight,
+							guests: occupancy?.guestCount || 0,
+							floorNumber: room.floor?.floorNumber || 0,
+							paidAmount: occupancy?.paidAmount || 0,
+							bookingId: occupancy?.id ? `BK-${occupancy.id}` : undefined,
+							occupancyId: occupancy?.id,
+							checkInAt: occupancy?.checkInTime,
+							expectedCheckOutDate: occupancy?.expectedCheckOut,
+							guestName: primaryGuest?.name,
+							guestEmail: primaryGuest?.email,
+							guestPhone: primaryGuest?.phone,
+						};
+					});
+					setRooms(transformedRooms);
+				}
+				setIsLoading(false);
+				
+				alert(
+					`Checkout successful!\n\n` +
+					`Guest: ${room.guestName}\n` +
+					`Nights Stayed: ${result.occupancy.nightsStayed}\n` +
+					`Room marked as DIRTY for cleaning.`
+				);
+				
+				// Close the modal if it's open
+				setIsRoomModalOpen(false);
+			} catch (error) {
+				console.error("Checkout error:", error);
+				alert(error instanceof Error ? error.message : "Failed to checkout guest");
+			}
 		}
 	};
 
-	const handleCheckIn = (roomId: number, checkInData: any) => {
-		const checkInTimestamp = new Date().toISOString();
-		setRooms((prevRooms) =>
-			prevRooms.map((room) =>
-				room.id === roomId
-					? { 
-						...room, 
-						status: "occupied", 
-						guests: checkInData.numberOfGuests,
-						guestName: checkInData.guestName,
-						guestEmail: checkInData.guestEmail,
-						guestPhone: checkInData.guestPhone,
-						paymentMethod: checkInData.paymentMethod,
-						checkInAt: checkInTimestamp,
-						expectedCheckOutDate: checkInData.checkOutDate || undefined,
-						checkOutAt: undefined,
-						paidAmount: 0,
-						idProofType: checkInData.idProofType || undefined,
-						idProofNumber: checkInData.idProofNumber || undefined,
+	const handleCheckIn = async (roomId: number, checkInData: any) => {
+		try {
+			const checkInTimestamp = new Date().toISOString();
+			
+			// Prepare API payload
+			const payload = {
+				roomId,
+				checkInTime: checkInTimestamp,
+				expectedCheckOut: checkInData.checkOutDate,
+				actualRoomRate: checkInData.pricePerNight,
+				actualCapacity: checkInData.numberOfGuests,
+				guests: [
+					{
+						name: checkInData.guestName,
+						email: checkInData.guestEmail,
+						phone: checkInData.guestPhone,
+						idProof: checkInData.idProofType,
+						idNumber: checkInData.idProofNumber,
+						isPrimary: true,
 					}
-					: room
-			)
-		);
-		setIsCheckInModalOpen(false);
-		setSelectedRoomId(null);
+				],
+				initialPayment: checkInData.advancePayment ? {
+					amount: checkInData.advancePayment,
+					paymentMethod: checkInData.paymentMethod,
+				} : undefined,
+			};
+
+			const response = await fetch("/api/receptionist/check-in", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(payload),
+			});
+
+			if (!response.ok) {
+				const error = await response.json();
+				throw new Error(error.error || "Check-in failed");
+			}
+
+			// Refresh rooms data after successful check-in
+			const roomsResponse = await fetch("/api/receptionist/rooms");
+			if (roomsResponse.ok) {
+				const data = await roomsResponse.json();
+				const transformedRooms: Room[] = data.rooms.map((room: any) => {
+					const occupancy = room.currentOccupancy;
+					const primaryGuest = occupancy?.guests?.[0];
+					
+					let normalizedStatus: "occupied" | "vacant" | "maintenance" = "vacant";
+					if (room.status === "OCCUPIED") normalizedStatus = "occupied";
+					else if (room.status === "MAINTENANCE") normalizedStatus = "maintenance";
+					else normalizedStatus = "vacant";
+					
+					return {
+						id: room.id,
+						number: room.roomNumber,
+						type: room.type,
+						status: normalizedStatus,
+						capacity: room.capacity,
+						pricePerNight: room.pricePerNight,
+						guests: occupancy?.guestCount || 0,
+						floorNumber: room.floor?.floorNumber || 0,
+						paidAmount: occupancy?.paidAmount || 0,
+						bookingId: occupancy?.id ? `BK-${occupancy.id}` : undefined,
+						checkInAt: occupancy?.checkInTime,
+						expectedCheckOutDate: occupancy?.expectedCheckOut,
+						guestName: primaryGuest?.name,
+						guestEmail: primaryGuest?.email,
+						guestPhone: primaryGuest?.phone,
+					};
+				});
+				setRooms(transformedRooms);
+			}
+
+			setIsCheckInModalOpen(false);
+			setSelectedRoomId(null);
+		} catch (error) {
+			console.error("Check-in error:", error);
+			alert(error instanceof Error ? error.message : "Failed to check in guest");
+		}
 	};
 
-	const removeMaintenance = (id: number) => {
-		setRooms((prevRooms) =>
-			prevRooms.map((room) => (room.id === id ? { ...room, status: "vacant", guests: 0 } : room))
-		);
+	const removeMaintenance = async (id: number) => {
+		try {
+			const response = await fetch(`/api/receptionist/rooms/${id}`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ status: "VACANT" }),
+			});
+
+			if (!response.ok) throw new Error("Failed to update room status");
+
+			setRooms((prevRooms) =>
+				prevRooms.map((room) => (room.id === id ? { ...room, status: "vacant", guests: 0 } : room))
+			);
+			alert("Room marked as vacant");
+		} catch (error) {
+			console.error("Error removing maintenance:", error);
+			alert("Failed to update room status");
+		}
+	};
+
+	const markRoomCleaning = async (id: number) => {
+		try {
+			const response = await fetch(`/api/receptionist/rooms/${id}`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ status: "CLEANING" }),
+			});
+
+			if (!response.ok) throw new Error("Failed to update room status");
+
+			setRooms((prevRooms) =>
+				prevRooms.map((room) => (room.id === id ? { ...room, status: "cleaning" } : room))
+			);
+			setIsRoomModalOpen(false);
+			alert("Room status updated to Cleaning");
+		} catch (error) {
+			console.error("Error updating room status:", error);
+			alert("Failed to update room status");
+		}
+	};
+
+	const markRoomVacantFromCleaning = async (id: number) => {
+		try {
+			const response = await fetch(`/api/receptionist/rooms/${id}`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ status: "VACANT" }),
+			});
+
+			if (!response.ok) throw new Error("Failed to update room status");
+
+			setRooms((prevRooms) =>
+				prevRooms.map((room) => (room.id === id ? { ...room, status: "vacant" } : room))
+			);
+			setIsRoomModalOpen(false);
+			alert("Room marked as vacant and ready for booking");
+		} catch (error) {
+			console.error("Error updating room status:", error);
+			alert("Failed to update room status");
+		}
 	};
 
 	const openRoomModal = (room: Room) => {
@@ -806,44 +917,138 @@ export default function RoomsPage() {
 		return { total, paid, balance, status };
 	};
 
-	const handleAddPayment = () => {
-		if (!selectedRoom) return;
+	const handleAddPayment = async () => {
+		console.log("handleAddPayment called");
+		console.log("selectedRoom:", selectedRoom);
+		console.log("paymentAmount:", paymentAmount);
+		
+		if (!selectedRoom || !selectedRoom.occupancyId) {
+			console.error("No selected room or occupancyId missing");
+			alert("Cannot process payment: No booking selected");
+			return;
+		}
+		
 		const amount = Number(paymentAmount);
-		if (!amount || amount <= 0) return;
-		const { total, paid } = getPaymentSummary(selectedRoom);
-		const nextPaid = Math.min(total, paid + amount);
-		setRooms((prevRooms) =>
-			prevRooms.map((room) =>
-				room.id === selectedRoom.id ? { ...room, paidAmount: nextPaid } : room
-			)
-		);
-		setPaymentAmount("");
+		console.log("Parsed amount:", amount);
+		
+		if (!amount || amount <= 0) {
+			alert("Please enter a valid payment amount");
+			return;
+		}
+		
+		const { total, paid, balance } = getPaymentSummary(selectedRoom);
+		console.log("Payment summary:", { total, paid, balance });
+		
+		if (amount > balance) {
+			alert(`Payment amount (₹${amount}) exceeds balance (₹${balance})`);
+			return;
+		}
+		
+		try {
+			console.log("Sending payment request...");
+			const response = await fetch("/api/receptionist/payments", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					occupancyId: selectedRoom.occupancyId,
+					amount,
+					paymentMethod: "CASH",
+					notes: `Payment for room ${selectedRoom.number}`,
+				}),
+			});
+
+			console.log("Response status:", response.status);
+			
+			if (!response.ok) {
+				const error = await response.json();
+				console.error("API error:", error);
+				throw new Error(error.error || "Failed to record payment");
+			}
+
+			const result = await response.json();
+			console.log("Payment recorded successfully:", result);
+
+			// Update local state
+			const nextPaid = Math.min(total, paid + amount);
+			setRooms((prevRooms) =>
+				prevRooms.map((room) =>
+					room.id === selectedRoom.id ? { ...room, paidAmount: nextPaid } : room
+				)
+			);
+			setPaymentAmount("");
+			alert("Payment recorded successfully!");
+		} catch (error) {
+			console.error("Payment error:", error);
+			alert(error instanceof Error ? error.message : "Failed to record payment");
+		}
 	};
 
-	const handleUpdatePrice = () => {
+	const handleUpdatePrice = async () => {
 		if (!selectedRoom) return;
 		const nextPrice = Number(priceDraft);
 		if (!nextPrice || nextPrice <= 0) return;
-		setRooms((prevRooms) =>
-			prevRooms.map((room) =>
-				room.id === selectedRoom.id ? { ...room, pricePerNight: nextPrice } : room
-			)
-		);
+		
+		try {
+			const response = await fetch(`/api/receptionist/rooms/${selectedRoom.id}`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ pricePerNight: nextPrice }),
+			});
+
+			if (!response.ok) {
+				const error = await response.json();
+				throw new Error(error.error || "Failed to update price");
+			}
+
+			// Update local state
+			setRooms((prevRooms) =>
+				prevRooms.map((room) =>
+					room.id === selectedRoom.id ? { ...room, pricePerNight: nextPrice } : room
+				)
+			);
+		} catch (error) {
+			console.error("Update price error:", error);
+			alert(error instanceof Error ? error.message : "Failed to update price");
+		}
 	};
 
-	const handleUpdateBooking = () => {
-		if (!selectedRoom) return;
-		const nextCheckOut = editCheckOutDate || selectedRoom.expectedCheckOutDate;
-		setRooms((prevRooms) =>
-			prevRooms.map((room) =>
-				room.id === selectedRoom.id
-					? {
-							...room,
-							expectedCheckOutDate: nextCheckOut,
-						}
-					: room
-			)
-		);
+	const handleUpdateBooking = async () => {
+		if (!selectedRoom || !selectedRoom.occupancyId) return;
+		if (!editCheckOutDate) {
+			alert("Please select a new checkout date");
+			return;
+		}
+		
+		try {
+			const response = await fetch(`/api/receptionist/occupancies/${selectedRoom.occupancyId}`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					expectedCheckOut: new Date(editCheckOutDate).toISOString(),
+				}),
+			});
+
+			if (!response.ok) {
+				const error = await response.json();
+				throw new Error(error.error || "Failed to update booking");
+			}
+
+			// Update local state
+			setRooms((prevRooms) =>
+				prevRooms.map((room) =>
+					room.id === selectedRoom.id
+						? {
+								...room,
+								expectedCheckOutDate: editCheckOutDate,
+							}
+							: room
+				)
+			);
+			alert("Booking updated successfully!");
+		} catch (error) {
+			console.error("Update booking error:", error);
+			alert(error instanceof Error ? error.message : "Failed to update booking");
+		}
 	};
 	const formatDateTime = (date?: string) => {
 		if (!date) return "N/A";
@@ -862,6 +1067,10 @@ export default function RoomsPage() {
 				return "border-green-200 dark:border-green-900 bg-green-50/60 dark:bg-green-950/40";
 			case "occupied":
 				return "border-orange-200 dark:border-orange-900 bg-orange-50/60 dark:bg-orange-950/40";
+			case "dirty":
+				return "border-red-200 dark:border-red-900 bg-red-50/60 dark:bg-red-950/40";
+			case "cleaning":
+				return "border-blue-200 dark:border-blue-900 bg-blue-50/60 dark:bg-blue-950/40";
 			case "maintenance":
 			default:
 				return "border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800";
@@ -926,14 +1135,13 @@ export default function RoomsPage() {
 						{/* Type Filter */}
 						<select
 							value={typeFilter}
-							onChange={(e) => setTypeFilter(e.target.value as "all" | "Suite" | "Deluxe" | "AC Room" | "Non-AC Room")}
+							onChange={(e) => setTypeFilter(e.target.value)}
 							className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 						>
 							<option value="all">All Types</option>
-							<option value="Suite">Suite</option>
-							<option value="Deluxe">Deluxe</option>
-							<option value="AC Room">AC Room</option>
-							<option value="Non-AC Room">Non-AC Room</option>
+							{Array.from(new Set(rooms.map(r => r.type))).sort().map(type => (
+								<option key={type} value={type}>{type}</option>
+							))}
 						</select>
 
 						<div className="flex gap-2">
@@ -965,7 +1173,14 @@ export default function RoomsPage() {
 					</div>
 
 					{/* Rooms by Floor */}
-					{floorOrder.map((floorNumber) => (
+					{isLoading ? (
+						<div className="text-center py-12">
+							<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-gray-100 mx-auto mb-4"></div>
+							<p className="text-muted-foreground">Loading rooms...</p>
+						</div>
+					) : (
+						<>
+							{floorOrder.map((floorNumber) => (
 						<div key={floorNumber} className="mb-8">
 							<div className="flex items-center justify-between mb-3">
 								<h2 className="text-xl font-semibold">{getFloorLabel(floorNumber)}</h2>
@@ -997,6 +1212,10 @@ export default function RoomsPage() {
 													? "bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-100"
 													: room.status === "vacant"
 													? "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-100"
+													: room.status === "dirty"
+													? "bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-100"
+													: room.status === "cleaning"
+													? "bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-100"
 													: "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-100"
 												}`}
 											>
@@ -1021,11 +1240,13 @@ export default function RoomsPage() {
 						</div>
 					))}
 
-					{filteredRooms.length === 0 && (
+					{filteredRooms.length === 0 && !isLoading && (
 						<div className="text-center py-12">
 							<DoorOpen size={48} className="mx-auto text-gray-400 mb-4" />
 							<p className="text-muted-foreground text-lg">No rooms found matching your filters</p>
 						</div>
+					)}
+						</>
 					)}
 
 
@@ -1040,6 +1261,8 @@ export default function RoomsPage() {
 						}}
 						onMarkVacant={() => selectedRoom && toggleRoomStatus(selectedRoom.id)}
 						onRemoveMaintenance={() => selectedRoom && removeMaintenance(selectedRoom.id)}
+						onMarkCleaning={() => selectedRoom && markRoomCleaning(selectedRoom.id)}
+						onMarkVacantFromCleaning={() => selectedRoom && markRoomVacantFromCleaning(selectedRoom.id)}
 						paymentSummary={selectedRoom ? getPaymentSummary(selectedRoom) : null}
 						nights={selectedRoom ? calculateNights(selectedRoom) : 0}
 						formatDate={formatDate}

@@ -199,7 +199,7 @@ export async function PATCH(
     const userId = (session.user as any)?.id;
     const { id: roomId } = await params;
     const body = await req.json();
-    const { status } = body;
+    const { status, pricePerNight } = body;
 
     // Get receptionist's assigned property
     const receptionist = await prisma.users.findUnique({
@@ -251,17 +251,31 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    // Update room status
+    // Validate pricePerNight
+    if (pricePerNight !== undefined && (isNaN(pricePerNight) || pricePerNight < 0)) {
+      return NextResponse.json({ error: "Invalid price" }, { status: 400 });
+    }
+
+    // Build update data
+    const updateData: any = {};
+    if (status) updateData.status = status;
+    if (pricePerNight !== undefined) updateData.pricePerNight = pricePerNight;
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+    }
+
+    // Update room
     const updatedRoom = await prisma.rooms.update({
       where: { id: roomId },
-      data: { status },
+      data: updateData,
       include: {
         floors: true,
       },
     });
 
     return NextResponse.json({
-      message: "Room status updated successfully",
+      message: "Room updated successfully",
       room: updatedRoom,
     });
   } catch (error) {
