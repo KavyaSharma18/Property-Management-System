@@ -54,6 +54,7 @@ export default function PropertiesList({ initial = [] }: { initial?: Property[] 
   const [editingFloor, setEditingFloor] = useState<any | null>(null);
   const [isFloorModalOpen, setIsFloorModalOpen] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
+  const [originalFloorCount, setOriginalFloorCount] = useState<number>(0);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,8 +133,10 @@ export default function PropertiesList({ initial = [] }: { initial?: Property[] 
         .map((s) => s.trim())
         .filter(Boolean);
 
-      // Prepare payload matching backend expectations
-      const payload = {
+      const isEditing = editingProperty !== null;
+
+      // Prepare payload - includes floors for both create and edit (API now handles updates intelligently)
+      const payload: any = {
         name: name.trim(),
         address: address.trim(),
         city: city.trim() || undefined,
@@ -154,15 +157,13 @@ export default function PropertiesList({ initial = [] }: { initial?: Property[] 
             roomType: room.roomType,
             capacity: parseInt(room.capacity) || 1,
             pricePerNight: parseFloat(room.pricePerNight) || 0,
-            roomCategory: room.roomCategory || "ECONOMY",
+            roomCategory: room.roomCategory || "MODERATE",
             description: room.description || "",
             amenities: room.amenities || [],
             images: room.images || [],
           })),
         })),
       };
-
-      const isEditing = editingProperty !== null;
       const url = isEditing ? `/api/owner/properties/${editingProperty.id}` : "/api/owner/properties";
       const method = isEditing ? "PUT" : "POST";
 
@@ -203,6 +204,7 @@ export default function PropertiesList({ initial = [] }: { initial?: Property[] 
       setShowForm(false);
       setError(null);
       setEditingProperty(null);
+      setOriginalFloorCount(0);
     } catch (err: any) {
       console.error("Error creating property:", err);
       const errorMsg = err.message || "Failed to create property";
@@ -258,7 +260,10 @@ export default function PropertiesList({ initial = [] }: { initial?: Property[] 
     setAmenities(amenitiesArr.join(", "));
     setImages(imagesArr.join(", "));
     
-    setNumberOfFloors(property.numberOfFloors || 1);
+    // Store original floor count to prevent reduction
+    const originalFloors = property.numberOfFloors || 1;
+    setOriginalFloorCount(originalFloors);
+    setNumberOfFloors(originalFloors);
     setTotalRooms(property.totalRooms || 0);
     
     // Load floors data and map to the correct format
@@ -421,15 +426,36 @@ export default function PropertiesList({ initial = [] }: { initial?: Property[] 
                 <select
                   id="floors"
                   value={numberOfFloors}
-                  onChange={(e) => { const n = Number(e.target.value); setNumberOfFloors(n); ensureFloors(n); }}
+                  onChange={(e) => { 
+                    const n = Number(e.target.value);
+                    // When editing, only allow increasing floors
+                    if (editingProperty && n < originalFloorCount) {
+                      setError(`Cannot reduce floors from ${originalFloorCount} to ${n}. You can only add more floors.`);
+                      return;
+                    }
+                    setNumberOfFloors(n); 
+                    ensureFloors(n); 
+                  }}
                   className="w-full rounded border p-2 pr-8 appearance-none bg-white dark:bg-gray-800 text-black dark:text-white"
                 >
-                  {Array.from({ length: 10 }).map((_, i) => (
-                    <option key={i} value={i + 1}>{i + 1}</option>
-                  ))}
+                  {Array.from({ length: 10 }).map((_, i) => {
+                    const floorNum = i + 1;
+                    // When editing, disable options below original count
+                    const isDisabled = editingProperty && floorNum < originalFloorCount;
+                    return (
+                      <option key={i} value={floorNum} disabled={isDisabled}>
+                        {floorNum} {isDisabled ? '(Cannot reduce)' : ''}
+                      </option>
+                    );
+                  })}
                 </select>
                 <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none text-muted-foreground dark:text-white" size={16} />
               </div>
+              {editingProperty && (
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                  ✓ Can add more floors | ✗ Cannot reduce from {originalFloorCount}
+                </p>
+              )}
             </div>
 
             <div>
@@ -450,7 +476,12 @@ export default function PropertiesList({ initial = [] }: { initial?: Property[] 
           </div>
 
           <div>
-            <Label>Floors</Label>
+            <Label>Floors & Rooms</Label>
+            {editingProperty && (
+              <p className="text-sm text-blue-600 dark:text-blue-400 mt-1 mb-2">
+                ✓ Update existing rooms | ✓ Add new rooms | ✗ Cannot remove rooms with bookings
+              </p>
+            )}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
               {floors.map((f, idx) => (
                 <div key={idx} className="p-3 border rounded flex items-center justify-between">
@@ -459,7 +490,13 @@ export default function PropertiesList({ initial = [] }: { initial?: Property[] 
                     <div className="text-xs text-muted-foreground">Rooms: {f.rooms?.length || 0}</div>
                   </div>
                   <div>
-                    <Button size="sm" type="button" onClick={() => openFloorEditor(idx)}>Edit</Button>
+                    <Button 
+                      size="sm" 
+                      type="button" 
+                      onClick={() => openFloorEditor(idx)}
+                    >
+                      Edit
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -484,6 +521,7 @@ export default function PropertiesList({ initial = [] }: { initial?: Property[] 
                 setShowForm(false);
                 setError(null);
                 setEditingProperty(null);
+                setOriginalFloorCount(0);
                 setFloors([]);
               }}
               disabled={isSubmitting}

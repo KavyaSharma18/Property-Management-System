@@ -137,6 +137,20 @@ export async function GET(req: NextRequest) {
         ? currentOccupancy.occupancy_guests.map((og: any) => og.guests)
         : [];
 
+      // Recalculate amounts for active occupancies
+      let recalculatedTotal = currentOccupancy?.totalAmount || 0;
+      let recalculatedBalance = currentOccupancy?.balanceAmount || 0;
+      
+      if (currentOccupancy && currentOccupancy.expectedCheckOut) {
+        const checkIn = new Date(currentOccupancy.checkInTime);
+        const expectedCheckOut = new Date(currentOccupancy.expectedCheckOut);
+        const nightsBooked = Math.max(1, Math.ceil(
+          (expectedCheckOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)
+        ));
+        recalculatedTotal = nightsBooked * currentOccupancy.actualRoomRate;
+        recalculatedBalance = Math.max(0, recalculatedTotal - (currentOccupancy.paidAmount || 0));
+      }
+
       return {
         id: room.id,
         roomNumber: room.roomNumber,
@@ -152,9 +166,9 @@ export async function GET(req: NextRequest) {
               expectedCheckOut: currentOccupancy.expectedCheckOut,
               actualRoomRate: currentOccupancy.actualRoomRate,
               actualCapacity: currentOccupancy.actualCapacity,
-              totalAmount: currentOccupancy.totalAmount,
+              totalAmount: recalculatedTotal,
               paidAmount: currentOccupancy.paidAmount,
-              balanceAmount: currentOccupancy.balanceAmount,
+              balanceAmount: recalculatedBalance,
               guestCount: guests.length,
               guests: guests,
             }

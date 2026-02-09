@@ -747,8 +747,8 @@ export default function RoomsPage() {
 						name: checkInData.guestName,
 						email: checkInData.guestEmail,
 						phone: checkInData.guestPhone,
-						idProof: checkInData.idProofType,
-						idNumber: checkInData.idProofNumber,
+						idProofType: checkInData.idProofType,
+						idProofNumber: checkInData.idProofNumber,
 						isPrimary: true,
 					}
 				],

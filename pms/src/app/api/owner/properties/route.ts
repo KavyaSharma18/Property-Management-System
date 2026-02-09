@@ -152,7 +152,7 @@ export async function POST(request: Request) {
       }
 
       // Validate room types and categories
-      const validRoomTypes = ['SINGLE', 'DOUBLE', 'TRIPLE', 'QUAD', 'SUITE', 'DELUXE', 'DORMITORY', 'STUDIO'];
+      const validRoomTypes = ['DELUXE', 'SUITE', 'AC', 'NON_AC'];
       const validRoomCategories = ['ECONOMY', 'MODERATE', 'PREMIUM', 'ELITE', 'VIP'];
       
       for (const floor of floorsData) {
@@ -234,24 +234,31 @@ export async function POST(request: Request) {
             (f) => f.floorNumber === floorData.floorNumber
           );
           
-          if (createdFloor) {
-            await prisma.rooms.createMany({
-              data: floorData.rooms.map((room: any) => ({
-                propertyId: property.id,
-                floorId: createdFloor.id,
-                roomNumber: room.roomNumber,
-                roomType: room.roomType,
-                roomCategory: room.roomCategory || "MODERATE",
-                capacity: parseInt(room.capacity),
-                pricePerNight: parseFloat(room.pricePerNight),
-                description: room.description,
-                amenities: room.amenities ? JSON.stringify(room.amenities) : null,
-                images: room.images ? JSON.stringify(room.images) : null,
-                size: room.size ? parseFloat(room.size) : null,
-                status: "VACANT",
-              })),
-            });
+          if (!createdFloor) {
+            console.error(`Floor ${floorData.floorNumber} not found in created property`);
+            continue;
           }
+
+          console.log(`Creating ${floorData.rooms.length} rooms for floor ${floorData.floorNumber}`);
+          
+          await prisma.rooms.createMany({
+            data: floorData.rooms.map((room: any) => ({
+              propertyId: property.id,
+              floorId: createdFloor.id,
+              roomNumber: room.roomNumber,
+              roomType: room.roomType,
+              roomCategory: room.roomCategory || "MODERATE",
+              capacity: parseInt(room.capacity) || 1,
+              pricePerNight: parseFloat(room.pricePerNight) || 0,
+              description: room.description || "",
+              amenities: room.amenities && room.amenities.length > 0 ? JSON.stringify(room.amenities) : null,
+              images: room.images && room.images.length > 0 ? JSON.stringify(room.images) : null,
+              size: room.size ? parseFloat(room.size) : null,
+              status: "VACANT",
+            })),
+          });
+          
+          console.log(`Successfully created rooms for floor ${floorData.floorNumber}`);
         }
       }
     }

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,6 +63,26 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 	const [showCorporateModal, setShowCorporateModal] = useState(false);
 	const [corporateData, setCorporateData] = useState<CorporateBookingData | null>(null);
 
+	// Reset form whenever modal opens or room changes
+	useEffect(() => {
+		if (open && room) {
+			setFormData({
+				guestName: "",
+				guestEmail: "",
+				guestPhone: "",
+				paymentMethod: "CASH",
+				checkOutDate: "",
+				numberOfGuests: 1,
+				idProofType: "",
+				idProofNumber: "",
+				pricePerNight: room.pricePerNight || 0,
+				advancePayment: undefined,
+			});
+			setErrors({});
+			setCorporateData(null);
+		}
+	}, [open, room]);
+
 	if (!open || !room) return null;
 
 	const handleModalClick = (e: React.MouseEvent) => {
@@ -121,6 +141,10 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault();
 		
+		console.log("=== Check-in Form Submission ===");
+		console.log("Form Data:", formData);
+		console.log("Room:", room);
+		
 		// Check if corporate payment is selected but no corporate data
 		if (formData.paymentMethod === "CORPORATE" && !corporateData) {
 			setShowCorporateModal(true);
@@ -128,10 +152,12 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 		}
 		
 		if (validateForm()) {
+			console.log("Form validation passed");
 			const dataToSubmit = { ...formData };
 			if (corporateData) {
 				dataToSubmit.corporateBooking = corporateData;
 			}
+			console.log("Data to submit:", dataToSubmit);
 			onConfirm(room.id, dataToSubmit);
 			// Reset form
 			setFormData({
@@ -148,6 +174,8 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 			});
 			setErrors({});
 			setCorporateData(null);
+		} else {
+			console.log("Form validation failed. Errors:", errors);
 		}
 	};
 
@@ -286,10 +314,10 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 										type="text"
 										inputMode="decimal"
 										placeholder="Enter advance amount"
-										value={formData.advancePayment || ""}
-										onChange={(e) => {
-											const value = e.target.value.replace(/[^0-9.]/g, '');
-											handleInputChange("advancePayment", value ? parseFloat(value) : undefined);
+									value={formData.advancePayment !== undefined ? formData.advancePayment : ""}
+									onChange={(e) => {
+										const value = e.target.value.replace(/[^0-9.]/g, '');
+										handleInputChange("advancePayment", value !== "" ? parseFloat(value) : undefined);
 										}}
 									/>
 								</div>

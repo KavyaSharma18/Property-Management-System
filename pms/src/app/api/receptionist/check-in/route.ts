@@ -24,6 +24,9 @@ export async function POST(req: NextRequest) {
 
     const userId = (session.user as any)?.id;
     const body = await req.json();
+    
+    console.log("=== Check-in API Request ===");
+    console.log("Body:", JSON.stringify(body, null, 2));
 
     const {
       roomId,
@@ -143,43 +146,70 @@ export async function POST(req: NextRequest) {
       for (const guestData of guests) {
         let guest;
 
-        // Check if guest already exists by email or phone
-        if (guestData.email) {
+        // Check if guest already exists by ID proof (most reliable unique identifier)
+        if (guestData.idProofType && guestData.idProofNumber) {
           guest = await tx.guests.findFirst({
-            where: { email: guestData.email },
+            where: {
+              idProofType: guestData.idProofType,
+              idProofNumber: guestData.idProofNumber,
+            },
+          });
+          
+          console.log("Guest lookup by ID proof:", {
+            idProofType: guestData.idProofType,
+            idProofNumber: guestData.idProofNumber,
+            found: !!guest,
+            existingGuest: guest ? { id: guest.id, name: guest.name } : null
           });
         }
 
-        if (!guest && guestData.phone) {
-          guest = await tx.guests.findFirst({
-            where: { phone: guestData.phone },
+        // If guest exists with same ID proof, update their contact details
+        if (guest) {
+          console.log("Updating existing guest:", guest.id);
+          guest = await tx.guests.update({
+            where: { id: guest.id },
+            data: {
+              name: guestData.name,
+              email: guestData.email || null,
+              phone: guestData.phone,
+              ...(guestData.alternatePhone && { alternatePhone: guestData.alternatePhone }),
+              ...(guestData.address && { address: guestData.address }),
+              ...(guestData.city && { city: guestData.city }),
+              ...(guestData.state && { state: guestData.state }),
+              ...(guestData.country && { country: guestData.country }),
+              ...(guestData.nationality && { nationality: guestData.nationality }),
+              ...(guestData.dateOfBirth && { dateOfBirth: new Date(guestData.dateOfBirth) }),
+              ...(guestData.gender && { gender: guestData.gender }),
+              ...(guestData.emergencyContact && { emergencyContact: guestData.emergencyContact }),
+              ...(guestData.emergencyPhone && { emergencyPhone: guestData.emergencyPhone }),
+              ...(guestData.notes && { notes: guestData.notes }),
+            },
           });
-        }
-
-        // Create new guest if not found
-        if (!guest) {
+        } else {
+          // Create new guest
+          console.log("Creating new guest:", guestData.name);
           guest = await tx.guests.create({
             data: {
               name: guestData.name,
-              email: guestData.email,
+              email: guestData.email || null,
               phone: guestData.phone,
-              alternatePhone: guestData.alternatePhone,
-              idProofType: guestData.idProofType,
-              otherIdProof: guestData.otherIdProof, // Custom ID proof if OTHER is selected
-              idProofNumber: guestData.idProofNumber,
-              idProofImage: guestData.idProofImage,
-              address: guestData.address,
-              city: guestData.city,
-              state: guestData.state,
-              country: guestData.country,
-              nationality: guestData.nationality,
+              alternatePhone: guestData.alternatePhone || null,
+              idProofType: guestData.idProofType || null,
+              otherIdProof: guestData.otherIdProof || null,
+              idProofNumber: guestData.idProofNumber || null,
+              idProofImage: guestData.idProofImage || null,
+              address: guestData.address || null,
+              city: guestData.city || null,
+              state: guestData.state || null,
+              country: guestData.country || null,
+              nationality: guestData.nationality || null,
               dateOfBirth: guestData.dateOfBirth
                 ? new Date(guestData.dateOfBirth)
                 : null,
-              gender: guestData.gender,
-              emergencyContact: guestData.emergencyContact,
-              emergencyPhone: guestData.emergencyPhone,
-              notes: guestData.notes,
+              gender: guestData.gender || null,
+              emergencyContact: guestData.emergencyContact || null,
+              emergencyPhone: guestData.emergencyPhone || null,
+              notes: guestData.notes || null,
             },
           });
         }
@@ -265,9 +295,16 @@ export async function POST(req: NextRequest) {
       occupancy: completeOccupancy,
     });
   } catch (error) {
-    console.error("Check-in error:", error);
+    console.error("=== Check-in API Error ===");
+    console.error("Error:", error);
+    console.error("Error message:", (error as Error)?.message);
+    console.error("Error stack:", (error as Error)?.stack);
+    
     return NextResponse.json(
-      { error: "Failed to complete check-in" },
+      { 
+        error: "Failed to complete check-in",
+        details: (error as Error)?.message || "Unknown error"
+      },
       { status: 500 }
     );
   }

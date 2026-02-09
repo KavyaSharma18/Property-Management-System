@@ -104,6 +104,20 @@ export async function GET(req: NextRequest) {
 
       const primaryGuest = occ.occupancy_guests.find((og: any) => og.isPrimary);
 
+      // Recalculate total amount based on expected checkout (if still active)
+      let recalculatedTotal = occ.totalAmount;
+      let recalculatedBalance = occ.balanceAmount || 0;
+      
+      if (!occ.actualCheckOut && occ.expectedCheckOut) {
+        // For active bookings, calculate based on check-in to expected checkout
+        const expectedCheckOutDate = new Date(occ.expectedCheckOut);
+        const nightsBooked = Math.max(1, Math.ceil(
+          (expectedCheckOutDate.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)
+        ));
+        recalculatedTotal = nightsBooked * occ.actualRoomRate;
+        recalculatedBalance = Math.max(0, recalculatedTotal - (occ.paidAmount || 0));
+      }
+
       return {
         id: occ.id,
         room: occ.rooms,
@@ -112,9 +126,9 @@ export async function GET(req: NextRequest) {
         actualCheckOut: occ.actualCheckOut,
         actualRoomRate: occ.actualRoomRate,
         actualCapacity: occ.actualCapacity,
-        totalAmount: occ.totalAmount,
+        totalAmount: recalculatedTotal,
         paidAmount: occ.paidAmount || 0,
-        balanceAmount: occ.balanceAmount || 0,
+        balanceAmount: recalculatedBalance,
         lastPaidDate: occ.lastPaidDate,
         bookingSource: occ.bookingSource, // How the booking was made
         corporateBookingId: occ.corporateBookingId, // Link to corporate booking if applicable

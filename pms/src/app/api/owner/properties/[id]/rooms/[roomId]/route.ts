@@ -229,13 +229,11 @@ export async function DELETE(
       return NextResponse.json({ error: "Property not found" }, { status: 404 });
     }
 
-    // Check if room exists and has active occupancies
+    // Check if room exists and has any booking history
     const room = await prisma.rooms.findFirst({
       where: { id: roomId, propertyId },
       include: {
-        occupancies: {
-          where: { actualCheckOut: null },
-        },
+        occupancies: true, // Check all occupancies, not just active ones
       },
     });
 
@@ -243,9 +241,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Room not found" }, { status: 404 });
     }
 
+    // Prevent deletion of rooms with ANY booking history to preserve financial records
     if (room.occupancies.length > 0) {
       return NextResponse.json(
-        { error: "Cannot delete room with active occupancies" },
+        { error: "Cannot delete room with booking history. This preserves financial records and guest data." },
         { status: 400 }
       );
     }

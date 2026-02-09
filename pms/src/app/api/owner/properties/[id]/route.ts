@@ -293,45 +293,150 @@ export async function PUT(
 
     // Handle floors update if provided
     if (floors && Array.isArray(floors)) {
-      // Delete existing floors and rooms for this property
-      await prisma.rooms.deleteMany({
-        where: { propertyId },
-      });
+      console.log("=== Floor Update Process ===");
       
-      await prisma.floors.deleteMany({
+      // Get existing floors and rooms
+      const existingFloors = await prisma.floors.findMany({
         where: { propertyId },
+        include: { 
+          rooms: {
+            include: {
+              occupancies: {
+                select: { 
+                  id: true,
+                  actualCheckOut: true 
+                }
+              }
+            }
+          }
+        },
+        orderBy: { floorNumber: 'asc' }
       });
 
-      // Create new floors and rooms
-      for (const floor of floors) {
-        const createdFloor = await prisma.floors.create({
-          data: {
-            propertyId,
-            floorNumber: floor.floorNumber,
-            floorName: floor.floorName || `Floor ${floor.floorNumber}`,
-            description: floor.description || "",
-          },
-        });
+      console.log(`Found ${existingFloors.length} existing floors`);
 
-        // Create rooms for this floor
-        if (floor.rooms && floor.rooms.length > 0) {
-          await prisma.rooms.createMany({
-            data: floor.rooms.map((room: any) => ({
-              propertyId,
-              floorId: createdFloor.id,
-              roomNumber: room.roomNumber,
-              roomType: room.roomType,
-              roomCategory: room.roomCategory || "ECONOMY",
-              capacity: room.capacity,
-              pricePerNight: room.pricePerNight,
-              description: room.description || "",
-              amenities: room.amenities ? JSON.stringify(room.amenities) : null,
-              images: room.images ? JSON.stringify(room.images) : null,
-              status: "VACANT",
-            })),
+      // Validate: Cannot reduce number of floors
+      const incomingFloorCount = floors.length;
+      const existingFloorCount = existingFloors.length;
+      
+      if (incomingFloorCount < existingFloorCount) {
+        return NextResponse.json(
+          {
+            error: `Cannot reduce floors from ${existingFloorCount} to ${incomingFloorCount}. You can only add more floors or keep the same number.`,
+          },
+          { status: 400 }
+        );
+      }
+
+      // Process each floor - UPDATE existing or CREATE new
+      for (const floorData of floors) {
+        const existingFloor = existingFloors.find(f => f.floorNumber === floorData.floorNumber);
+        
+        if (existingFloor) {
+          // UPDATE existing floor
+          console.log(`Updating floor ${floorData.floorNumber}`);
+          await prisma.floors.update({
+            where: { id: existingFloor.id },
+            data: {
+              floorName: floorData.floorName || `Floor ${floorData.floorNumber}`,
+              description: floorData.description || "",
+            }
           });
+
+          // Get existing rooms on this floor
+          const existingRoomsOnFloor = existingFloor.rooms;
+          const incomingRooms = floorData.rooms || [];
+
+          // Validate: Cannot reduce number of rooms
+          const existingRoomsWithHistory = existingRoomsOnFloor.filter(room => room.occupancies.length > 0);
+          
+          // Check if trying to remove rooms with history
+          for (const existingRoom of existingRoomsWithHistory) {
+            const stillExists = incomingRooms.some((r: any) => r.roomNumber === existingRoom.roomNumber);
+            if (!stillExists) {
+              return NextResponse.json(
+                {
+                  error: `Cannot remove room ${existingRoom.roomNumber} on Floor ${floorData.floorNumber}. This room has booking history and must be preserved.`,
+                },
+                { status: 400 }
+              );
+            }
+          }
+
+          // Process rooms - UPDATE existing or CREATE new
+          for (const roomData of incomingRooms) {
+            const existingRoom = existingRoomsOnFloor.find((r: any) => r.roomNumber === roomData.roomNumber);
+            
+            if (existingRoom) {
+              // UPDATE existing room - preserves all revenue and booking history
+              console.log(`Updating room ${roomData.roomNumber}`);
+              await prisma.rooms.update({
+                where: { id: existingRoom.id },
+                data: {
+                  roomType: roomData.roomType,
+                  roomCategory: roomData.roomCategory || "MODERATE",
+                  capacity: roomData.capacity,
+                  pricePerNight: roomData.pricePerNight,
+                  description: roomData.description || "",
+                  amenities: roomData.amenities ? JSON.stringify(roomData.amenities) : null,
+                  images: roomData.images ? JSON.stringify(roomData.images) : null,
+                  // Keep existing status and don't override it
+                }
+              });
+            } else {
+              // CREATE new room
+              console.log(`Creating new room ${roomData.roomNumber} on floor ${floorData.floorNumber}`);
+              await prisma.rooms.create({
+                data: {
+                  propertyId,
+                  floorId: existingFloor.id,
+                  roomNumber: roomData.roomNumber,
+                  roomType: roomData.roomType,
+                  roomCategory: roomData.roomCategory || "MODERATE",
+                  capacity: roomData.capacity,
+                  pricePerNight: roomData.pricePerNight,
+                  description: roomData.description || "",
+                  amenities: roomData.amenities ? JSON.stringify(roomData.amenities) : null,
+                  images: roomData.images ? JSON.stringify(roomData.images) : null,
+                  status: "VACANT",
+                }
+              });
+            }
+          }
+        } else {
+          // CREATE new floor
+          console.log(`Creating new floor ${floorData.floorNumber}`);
+          const newFloor = await prisma.floors.create({
+            data: {
+              propertyId,
+              floorNumber: floorData.floorNumber,
+              floorName: floorData.floorName || `Floor ${floorData.floorNumber}`,
+              description: floorData.description || "",
+            },
+          });
+
+          // Create all rooms for new floor
+          if (floorData.rooms && floorData.rooms.length > 0) {
+            await prisma.rooms.createMany({
+              data: floorData.rooms.map((room: any) => ({
+                propertyId,
+                floorId: newFloor.id,
+                roomNumber: room.roomNumber,
+                roomType: room.roomType,
+                roomCategory: room.roomCategory || "MODERATE",
+                capacity: room.capacity,
+                pricePerNight: room.pricePerNight,
+                description: room.description || "",
+                amenities: room.amenities ? JSON.stringify(room.amenities) : null,
+                images: room.images ? JSON.stringify(room.images) : null,
+                status: "VACANT",
+              })),
+            });
+          }
         }
       }
+
+      console.log("=== Floor Update Complete ===");
     }
 
     return NextResponse.json(
