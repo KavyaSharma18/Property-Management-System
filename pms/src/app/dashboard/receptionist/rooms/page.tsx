@@ -548,7 +548,7 @@ export default function RoomsPage() {
 	const [rooms, setRooms] = useState<Room[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [searchTerm, setSearchTerm] = useState("");
-	const [statusFilter, setStatusFilter] = useState<"all" | "occupied" | "vacant" | "maintenance">("all");
+	const [statusFilter, setStatusFilter] = useState<"all" | "occupied" | "vacant" | "dirty" | "cleaning">("all");
 	const [capacityFilter, setCapacityFilter] = useState<"all" | "1" | "2" | "4">("all");
 	const [typeFilter, setTypeFilter] = useState<string>("all");
 	const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
@@ -598,6 +598,7 @@ export default function RoomsPage() {
 						guestName: primaryGuest?.name,
 						guestEmail: primaryGuest?.email,
 						guestPhone: primaryGuest?.phone,
+						isGroupBooking: !!occupancy?.groupBookingId,
 					};
 				});
 				
@@ -628,8 +629,9 @@ export default function RoomsPage() {
 
 	const vacantCount = rooms.filter((r) => r.status === "vacant").length;
 	const occupiedCount = rooms.filter((r) => r.status === "occupied").length;
-	const maintenanceCount = rooms.filter((r) => r.status === "maintenance").length;
-	const occupancyDenominator = Math.max(1, rooms.length - maintenanceCount);
+	const dirtyCount = rooms.filter((r) => r.status === "dirty").length;
+	const cleaningCount = rooms.filter((r) => r.status === "cleaning").length;
+	const occupancyDenominator = Math.max(1, rooms.length);
 	const occupancyRate = Math.round((occupiedCount / occupancyDenominator) * 100);
 
 	const toggleRoomStatus = async (id: number) => {
@@ -706,11 +708,12 @@ export default function RoomsPage() {
 							guestName: primaryGuest?.name,
 							guestEmail: primaryGuest?.email,
 							guestPhone: primaryGuest?.phone,
-						};
-					});
-					setRooms(transformedRooms);
-				}
-				setIsLoading(false);
+						isGroupBooking: !!occupancy?.groupBookingId,
+					};
+				});
+				setRooms(transformedRooms);
+			}
+			setIsLoading(false);
 				
 				alert(
 					`Checkout successful!\n\n` +
@@ -795,11 +798,12 @@ export default function RoomsPage() {
 						guestName: primaryGuest?.name,
 						guestEmail: primaryGuest?.email,
 						guestPhone: primaryGuest?.phone,
+						isGroupBooking: !!occupancy?.groupBookingId,
 					};
 				});
 				setRooms(transformedRooms);
 			}
-
+			
 			setIsCheckInModalOpen(false);
 			setSelectedRoomId(null);
 		} catch (error) {
@@ -1164,10 +1168,16 @@ export default function RoomsPage() {
 								Occupied
 							</Button>
 							<Button
-								variant={statusFilter === "maintenance" ? "default" : "outline"}
-								onClick={() => setStatusFilter("maintenance")}
+								variant={statusFilter === "dirty" ? "default" : "outline"}
+								onClick={() => setStatusFilter("dirty")}
 							>
-								Maintenance
+								Dirty
+							</Button>
+							<Button
+								variant={statusFilter === "cleaning" ? "default" : "outline"}
+								onClick={() => setStatusFilter("cleaning")}
+							>
+								Cleaning
 							</Button>
 						</div>
 					</div>
@@ -1224,6 +1234,11 @@ export default function RoomsPage() {
 										</div>
 
 										<div className="text-[11px] text-muted-foreground mb-1">{room.type}</div>
+										{room.status === "occupied" && room.guestName && (
+											<div className="text-[10px] text-blue-600 dark:text-blue-400 mb-1 truncate" title={room.guestName}>
+												👤 {room.guestName}
+											</div>
+										)}
 										<div className="grid grid-cols-2 gap-2 text-[11px]">
 											<div>
 												<p className="text-xs text-muted-foreground">Capacity</p>
