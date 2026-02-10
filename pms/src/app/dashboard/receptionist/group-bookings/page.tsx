@@ -298,10 +298,10 @@ export default function GroupBookingsPage() {
 			const response = await fetch(`/api/receptionist/group-bookings/${booking.id}`);
 			if (response.ok) {
 				const data = await response.json();
-				// Extract room information from occupancies
-				const rooms = data.occupancies?.map((occ: any) => ({
-					roomNumber: occ.rooms?.roomNumber || 'N/A',
-					status: occ.rooms?.status || 'unknown'
+				// Extract room information from the response
+				const rooms = data.groupBooking?.rooms?.map((roomData: any) => ({
+					roomNumber: roomData.room?.roomNumber || 'N/A',
+					status: roomData.room?.status || 'unknown'
 				})) || [];
 				setViewDetailsBooking({...booking, rooms});
 			}
@@ -604,16 +604,8 @@ export default function GroupBookingsPage() {
 													<p className="font-medium">#{viewDetailsBooking.id}</p>
 												</div>
 												<div>
-													<p className="text-sm text-muted-foreground">Total Rooms</p>
-													<p className="font-medium">{viewDetailsBooking.totalRooms}</p>
-												</div>
-												<div>
 													<p className="text-sm text-muted-foreground">Rooms Booked</p>
 													<p className="font-medium text-green-600">{viewDetailsBooking.roomsBooked}</p>
-												</div>
-												<div>
-													<p className="text-sm text-muted-foreground">Rooms Pending</p>
-													<p className="font-medium text-orange-600">{viewDetailsBooking.roomsPending}</p>
 												</div>
 											</div>
 										</div>

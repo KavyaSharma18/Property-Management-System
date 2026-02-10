@@ -274,6 +274,8 @@ export async function POST(req: NextRequest) {
       });
 
       return { occupancy, guests: createdGuests };
+    },{
+      timeout:15000, //15 seconds of wait
     });
 
     // Fetch complete occupancy data

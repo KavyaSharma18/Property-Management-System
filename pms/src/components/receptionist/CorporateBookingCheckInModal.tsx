@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MultiSelect } from "@/components/ui/multi-select";
 
 interface Room {
 	id: number;
@@ -144,7 +145,9 @@ const CorporateBookingCheckInModal: React.FC<CorporateBookingCheckInModalProps> 
 
 		if (!formData.guestPhone.trim()) newErrors.guestPhone = "Phone number is required";
 		
-		if (formData.checkOutDate) {
+		if (!formData.checkOutDate) {
+			newErrors.checkOutDate = "Check-out date is required";
+		} else {
 			const checkIn = new Date(formData.checkInDate);
 			const checkOut = new Date(formData.checkOutDate);
 			if (checkOut <= checkIn) {
@@ -341,28 +344,24 @@ const CorporateBookingCheckInModal: React.FC<CorporateBookingCheckInModalProps> 
 							) : (
 							<>
 								<div className="relative">
-									<select
-										multiple
-										size={6}
-										className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-										onChange={(e) => {
-											const selectedOptions = Array.from(e.target.selectedOptions);
-											const roomIds = selectedOptions.map(opt => parseInt(opt.value));
-											handleInputChange("selectedRoomIds", roomIds);
+									<MultiSelect
+										options={availableRooms.map((room) => ({
+											id: room.id,
+											label: `Room #${room.number} - ${room.type}`,
+											sublabel: `Capacity: ${room.capacity} | ₹${room.pricePerNight}/night`,
+										}))}
+										selectedIds={formData.selectedRoomIds}
+										onChange={(selectedIds) => {
+											handleInputChange("selectedRoomIds", selectedIds);
+											// Update price based on first selected room
+											const newPrice = selectedIds.length > 0
+												? availableRooms.find(r => r.id === selectedIds[0])?.pricePerNight || 0
+												: 0;
+											handleInputChange("pricePerNight", newPrice);
 										}}
-										value={formData.selectedRoomIds.map(String)}
-									>
-										{availableRooms.length === 0 ? (
-											<option disabled>No vacant rooms available</option>
-										) : (
-											availableRooms.map((room) => (
-												<option key={room.id} value={room.id}>
-													Room #{room.number} - {room.type} (Capacity: {room.capacity}) - ₹{room.pricePerNight}/night
-												</option>
-											))
-										)}
-									</select>
-									<p className="text-xs text-muted-foreground mt-1">Hold Ctrl/Cmd to select multiple rooms</p>
+										placeholder="Click to select rooms"
+										emptyMessage="No vacant rooms available"
+									/>
 								</div>
 								{errors.selectedRoomIds && <p className="text-red-500 text-xs mt-1">{errors.selectedRoomIds}</p>}
 								{formData.selectedRoomIds.length > 0 && (
@@ -394,7 +393,7 @@ const CorporateBookingCheckInModal: React.FC<CorporateBookingCheckInModalProps> 
 						
 						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 							<div>
-								<Label htmlFor="checkInDate">Check-In Date</Label>
+								<Label htmlFor="checkInDate">Check-In Date *</Label>
 								<Input
 									id="checkInDate"
 									type="date"
@@ -404,7 +403,7 @@ const CorporateBookingCheckInModal: React.FC<CorporateBookingCheckInModalProps> 
 							</div>
 
 							<div>
-								<Label htmlFor="checkOutDate">Check-Out Date (Optional)</Label>
+								<Label htmlFor="checkOutDate">Check-Out Date *</Label>
 								<Input
 									id="checkOutDate"
 									type="date"
@@ -489,10 +488,13 @@ const CorporateBookingCheckInModal: React.FC<CorporateBookingCheckInModalProps> 
 										}`}
 									>
 										<option value="">Select ID Type</option>
-										<option value="AADHAR">Aadhar</option>
-										<option value="PASSPORT">Passport</option>
-										<option value="DRIVING_LICENSE">Driving License</option>
-										<option value="VOTER_ID">Voter ID</option>
+                                        <option value="AADHAAR_CARD">Aadhaar Card</option>
+                                        <option value="PASSPORT">Passport</option>
+                                        <option value="DRIVING_LICENSE">Driving License</option>
+                                        <option value="VOTER_ID">Voter ID</option>
+                                        <option value="PAN_CARD">PAN Card</option>
+                                        <option value="RATION_CARD">Ration Card</option>
+                                        <option value="OTHER">Other</option>
 									</select>
 									{errors.idProofType && <p className="text-red-500 text-xs mt-1">{errors.idProofType}</p>}
 								</div>
@@ -524,6 +526,53 @@ const CorporateBookingCheckInModal: React.FC<CorporateBookingCheckInModalProps> 
 								/>
 							</div>
 						</div>
+
+						{/* Price Summary */}
+						{formData.selectedRoomIds.length > 0 && (
+							<div className="pt-4 border-t dark:border-gray-700">
+								<div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+									<div className="flex justify-between items-center">
+										<span className="text-sm text-muted-foreground">Number of rooms:</span>
+										<span className="font-semibold">{formData.selectedRoomIds.length}</span>
+									</div>
+									{formData.checkInDate && formData.checkOutDate && (() => {
+										const checkIn = new Date(formData.checkInDate);
+										const checkOut = new Date(formData.checkOutDate);
+										if (checkOut <= checkIn) return null;
+										const nights = Math.ceil(
+											(checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)
+										);
+										
+										// Calculate total for all selected rooms
+										const totalPerNight = formData.selectedRoomIds.reduce((sum, roomId) => {
+											const room = availableRooms.find(r => r.id === roomId);
+											return sum + (room?.pricePerNight || 0);
+										}, 0);
+										
+										const grandTotal = totalPerNight * nights;
+										
+										return (
+											<>
+												<div className="flex justify-between items-center mt-2">
+													<span className="text-sm text-muted-foreground">Total per night:</span>
+													<span className="font-semibold">₹{totalPerNight.toLocaleString()}</span>
+												</div>
+												<div className="flex justify-between items-center mt-2">
+													<span className="text-sm text-muted-foreground">Number of nights:</span>
+													<span className="font-semibold">{nights}</span>
+												</div>
+												<div className="flex justify-between items-center mt-2 pt-2 border-t dark:border-gray-600">
+													<span className="font-semibold">Grand Total:</span>
+													<span className="text-xl font-bold text-purple-600">
+														₹{grandTotal.toLocaleString()}
+													</span>
+												</div>
+											</>
+										);
+									})()}
+								</div>
+							</div>
+						)}
 					</div>
 
 					<div className="flex items-center gap-3 mt-6 pt-4 border-t dark:border-gray-700">

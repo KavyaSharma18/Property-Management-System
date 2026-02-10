@@ -116,9 +116,14 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 
 
 		if (!formData.guestPhone.trim()) newErrors.guestPhone = "Phone number is required";
-		const today = new Date().toISOString().split("T")[0];
-		if (formData.checkOutDate && today >= formData.checkOutDate) {
-			newErrors.checkOutDate = "Check-out must be after today";
+		
+		if (!formData.checkOutDate) {
+			newErrors.checkOutDate = "Check-out date is required";
+		} else {
+			const today = new Date().toISOString().split("T")[0];
+			if (today >= formData.checkOutDate) {
+				newErrors.checkOutDate = "Check-out must be after today";
+			}
 		}
 
 		if (formData.numberOfGuests < 1) {
@@ -273,7 +278,7 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 							
 							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 								<div>
-									<Label htmlFor="checkOutDate">Check-Out Date</Label>
+									<Label htmlFor="checkOutDate">Check-Out Date *</Label>
 									<Input
 										id="checkOutDate"
 										type="date"
@@ -369,10 +374,13 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 										}`}
 									>
 										<option value="">Select ID Type</option>
-										<option value="AADHAR">Aadhar</option>
-										<option value="PASSPORT">Passport</option>
-										<option value="DRIVING_LICENSE">Driving License</option>
-										<option value="VOTER_ID">Voter ID</option>
+                                        <option value="AADHAAR_CARD">Aadhaar Card</option>
+                                        <option value="PASSPORT">Passport</option>
+                                        <option value="DRIVING_LICENSE">Driving License</option>
+                                        <option value="VOTER_ID">Voter ID</option>
+                                        <option value="PAN_CARD">PAN Card</option>
+                                        <option value="RATION_CARD">Ration Card</option>
+                                        <option value="OTHER">Other</option>
 									</select>
 									{errors.idProofType && <p className="text-red-500 text-xs mt-1">{errors.idProofType}</p>}
 								</div>
