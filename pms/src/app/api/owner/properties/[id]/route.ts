@@ -102,17 +102,28 @@ export async function GET(
     const occupancyRate = actualRoomsCreated > 0 ? (occupiedRooms / actualRoomsCreated) * 100 : 0;
 
     let totalOccupants = 0;
-    let totalRevenue = 0;
 
     property.rooms.forEach((room) => {
       room.occupancies.forEach((occupancy) => {
         totalOccupants += occupancy.numberOfOccupants;
-        // Count paid amount (partial or full payment)
-        if (occupancy.paidAmount) {
-          totalRevenue += occupancy.paidAmount;
-        }
       });
     });
+
+    // Get total revenue from ALL payments for this property (not just active occupancies)
+    const allPayments = await prisma.payments.findMany({
+      where: {
+        occupancies: {
+          rooms: {
+            propertyId,
+          },
+        },
+      },
+      select: {
+        amount: true,
+      },
+    });
+
+    const totalRevenue = allPayments.reduce((sum, payment) => sum + payment.amount, 0);
 
     // Room status breakdown
     const roomsByType = property.rooms.reduce((acc: any, room) => {

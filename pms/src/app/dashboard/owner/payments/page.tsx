@@ -106,6 +106,10 @@ export default function PaymentsPage() {
 	const [loadingRevenue, setLoadingRevenue] = useState(false);
 	const [properties, setProperties] = useState<any[]>([]);
 	const [selectedPropertyId, setSelectedPropertyId] = useState<string>("all");
+	const [selectedPropertyIdOutstanding, setSelectedPropertyIdOutstanding] = useState<string>("all");
+	const [selectedPropertyIdHistory, setSelectedPropertyIdHistory] = useState<string>("all");
+	const [historyStartDate, setHistoryStartDate] = useState("");
+	const [historyEndDate, setHistoryEndDate] = useState("");
 
 	useEffect(() => {
 		if (status === "unauthenticated") {
@@ -123,6 +127,9 @@ export default function PaymentsPage() {
 			const url = new URL("/api/owner/payments/outstanding", window.location.origin);
 			if (filterOverdue) {
 				url.searchParams.append("overdue", "true");
+			}
+			if (selectedPropertyIdOutstanding && selectedPropertyIdOutstanding !== "all") {
+				url.searchParams.append("propertyId", selectedPropertyIdOutstanding);
 			}
 			
 			const res = await fetch(url.toString());
@@ -142,7 +149,20 @@ export default function PaymentsPage() {
 
 	const fetchPaymentHistory = async () => {
 		try {
-			const res = await fetch("/api/owner/payments/history?limit=50");
+			const url = new URL("/api/owner/payments/history", window.location.origin);
+			url.searchParams.append("limit", "50");
+			
+			if (selectedPropertyIdHistory && selectedPropertyIdHistory !== "all") {
+				url.searchParams.append("propertyId", selectedPropertyIdHistory);
+			}
+			if (historyStartDate) {
+				url.searchParams.append("startDate", historyStartDate);
+			}
+			if (historyEndDate) {
+				url.searchParams.append("endDate", historyEndDate);
+			}
+			
+			const res = await fetch(url.toString());
 			if (!res.ok) {
 				throw new Error("Failed to fetch payment history");
 			}
@@ -204,7 +224,7 @@ export default function PaymentsPage() {
 		if (status === "authenticated") {
 			fetchOutstandingPayments();
 		}
-	}, [filterOverdue]);
+	}, [filterOverdue, selectedPropertyIdOutstanding]);
 
 	useEffect(() => {
 		if (status === "authenticated") {
@@ -361,17 +381,39 @@ export default function PaymentsPage() {
 					{/* Outstanding Tab */}
 					<TabsContent value="outstanding">
 						{/* Search and Filter Bar */}
-						<div className="flex gap-4 mb-6 flex-wrap">
-							<div className="flex-1 relative min-w-[300px]">
-								<Search size={18} className="absolute left-3 top-3 text-muted-foreground" />
-								<input
-									type="text"
-									placeholder="Search by guest, room, property, or occupancy ID..."
-									value={searchTerm}
-									onChange={(e) => setSearchTerm(e.target.value)}
-									className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-								/>
+					<div className="space-y-4 mb-6">
+						<div className="flex gap-4 flex-wrap">
+							<div className="flex-1 min-w-[250px]">
+								<Label htmlFor="property-filter-outstanding" className="mb-2 block">Property</Label>
+								<select
+									id="property-filter-outstanding"
+									value={selectedPropertyIdOutstanding}
+									onChange={(e) => setSelectedPropertyIdOutstanding(e.target.value)}
+									className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+								>
+									<option value="all">All Properties</option>
+									{properties.map((property) => (
+										<option key={property.id} value={property.id}>
+											{property.name} - {property.city}
+										</option>
+									))}
+								</select>
 							</div>
+							<div className="flex-1 relative min-w-[250px]">
+								<Label className="mb-2 block">Search</Label>
+								<div className="relative">
+									<Search size={18} className="absolute left-3 top-3 text-muted-foreground" />
+									<input
+										type="text"
+										placeholder="Search by guest, room, property..."
+										value={searchTerm}
+										onChange={(e) => setSearchTerm(e.target.value)}
+										className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+									/>
+								</div>
+							</div>
+						</div>
+						<div className="flex gap-3">
 							<Button
 								variant={filterOverdue ? "default" : "outline"}
 								onClick={() => setFilterOverdue(!filterOverdue)}
@@ -495,18 +537,78 @@ export default function PaymentsPage() {
 									))
 								)}
 							</div>
-						</TabsContent>
+						</div>
+					</TabsContent>
 
-						{/* Payment History Tab */}
-						<TabsContent value="history" className="space-y-6">
-							{/* Search */}
-							<div className="relative">
-								<Search size={18} className="absolute left-3 top-3 text-muted-foreground" />
-								<input
-									type="text"
-									placeholder="Search payment history..."
-									value={searchTerm}
-									onChange={(e) => setSearchTerm(e.target.value)}
+					{/* Payment History Tab */}
+					<TabsContent value="history" className="space-y-6">
+							{/* Filters */}
+							<Card>
+							<CardHeader>
+								<CardTitle>Filters</CardTitle>
+							</CardHeader>
+							<CardContent className="space-y-4">
+								<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+									<div>
+										<Label htmlFor="property-filter-history">Property</Label>
+										<select
+											id="property-filter-history"
+											value={selectedPropertyIdHistory}
+											onChange={(e) => setSelectedPropertyIdHistory(e.target.value)}
+											className="w-full mt-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+										>
+											<option value="all">All Properties</option>
+											{properties.map((property) => (
+												<option key={property.id} value={property.id}>
+													{property.name} - {property.city}
+												</option>
+											))}
+										</select>
+									</div>
+									<div>
+										<Label htmlFor="history-start-date">Start Date</Label>
+										<input
+											id="history-start-date"
+											type="date"
+											value={historyStartDate}
+											onChange={(e) => setHistoryStartDate(e.target.value)}
+											className="w-full mt-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+										/>
+									</div>
+									<div>
+										<Label htmlFor="history-end-date">End Date</Label>
+										<input
+											id="history-end-date"
+											type="date"
+											value={historyEndDate}
+											onChange={(e) => setHistoryEndDate(e.target.value)}
+											className="w-full mt-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+										/>
+									</div>
+								</div>
+								<div className="flex gap-3">
+									<Button onClick={fetchPaymentHistory}>
+										<Search className="w-4 h-4 mr-2" />
+										Apply Filters
+									</Button>
+									<Button variant="outline" onClick={() => {
+										setSelectedPropertyIdHistory("all");
+										setHistoryStartDate("");
+										setHistoryEndDate("");
+										setSearchTerm("");
+									}}>
+										Clear Filters
+									</Button>
+								</div>
+							</CardContent>
+						</Card>
+
+						{/* Search */}
+						<div className="relative">
+							<Search size={18} className="absolute left-3 top-3 text-muted-foreground" />
+							<input
+								type="text"
+								placeholder="Search by guest, room, property, or payment ID..."
 									className="w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
 								/>
 							</div>
@@ -631,30 +733,40 @@ export default function PaymentsPage() {
 									</Button>
 									
 									{revenuePeriod === "custom" && (
-										<div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-											<div>
-												<Label htmlFor="start-date">Start Date</Label>
-												<input
-													id="start-date"
-													type="date"
-													value={customStartDate}
-													onChange={(e) => setCustomStartDate(e.target.value)}
-													className="w-full mt-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-												/>
+										<div className="space-y-3 mt-3">
+											<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+												<div>
+													<Label htmlFor="start-date">Start Date</Label>
+													<input
+														id="start-date"
+														type="date"
+														value={customStartDate}
+														onChange={(e) => setCustomStartDate(e.target.value)}
+														className="w-full mt-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+													/>
+												</div>
+												<div>
+													<Label htmlFor="end-date">End Date</Label>
+													<input
+														id="end-date"
+														type="date"
+														value={customEndDate}
+														onChange={(e) => setCustomEndDate(e.target.value)}
+														className="w-full mt-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+													/>
+												</div>
 											</div>
-											<div>
-												<Label htmlFor="end-date">End Date</Label>
-												<input
-													id="end-date"
-													type="date"
-													value={customEndDate}
-													onChange={(e) => setCustomEndDate(e.target.value)}
-												className="w-full mt-1 px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-											/>
+											<Button 
+												onClick={fetchRevenue}
+												className="w-full"
+												disabled={!customStartDate || !customEndDate || loadingRevenue}
+											>
+												<Search className="w-4 h-4 mr-2" />
+												{loadingRevenue ? "Loading..." : "Apply Date Range"}
+											</Button>
 										</div>
-									</div>
-								)}
-							</div>
+									)}
+								</div>
 						</CardContent>
 					</Card>
 

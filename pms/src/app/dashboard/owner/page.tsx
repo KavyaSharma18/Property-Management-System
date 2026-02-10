@@ -105,7 +105,7 @@ export default async function OwnerDashboard() {
     const reservedRooms = roomStatusCounts["RESERVED"] || 0;
 
     const occupancyRate =
-      totalRooms > 0 ? ((occupiedRooms / totalRooms) * 100) : 0;
+      totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0;
 
     // Get all payments for revenue calculation
     const allPayments = await prisma.payments.findMany({
@@ -220,7 +220,7 @@ export default async function OwnerDashboard() {
       const occupied = rooms.filter((r) => r.status === "OCCUPIED").length;
       const vacant = rooms.filter((r) => r.status === "VACANT").length;
       const propOccupancyRate =
-        rooms.length > 0 ? ((occupied / rooms.length) * 100) : 0;
+        rooms.length > 0 ? Math.round((occupied / rooms.length) * 100) : 0;
 
       return {
         id: property.id,

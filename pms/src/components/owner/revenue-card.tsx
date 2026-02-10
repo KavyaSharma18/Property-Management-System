@@ -97,7 +97,7 @@ export default function RevenueCard() {
 										))}
 										
 										{/* Custom Date Range Section */}
-										<div className="border-t dark:border-gray-700 dark:border-gray-700 mt-1 pt-2 px-4 pb-3">
+										<div className="border-t dark:border-gray-700 mt-1 pt-2 px-4 pb-3">
 											<div className="flex items-center gap-2 mb-2">
 												<Calendar size={14} className="text-blue-600 dark:text-blue-400" />
 												<span className="text-xs font-semibold text-gray-700 dark:text-gray-200">Custom Range</span>

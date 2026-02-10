@@ -76,6 +76,7 @@ export default function PropertyDetail({ params }: Props) {
   const [isFloorsManagerOpen, setIsFloorsManagerOpen] = useState(false);
   const [isFloorModalOpen, setIsFloorModalOpen] = useState(false);
   const [editingFloorIndex, setEditingFloorIndex] = useState<number | null>(null);
+  const [originalFloorCount, setOriginalFloorCount] = useState<number>(0);
   const [property, setProperty] = useState<Property | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -155,6 +156,9 @@ export default function PropertyDetail({ params }: Props) {
       setIsUpdating(true);
       setError(null);
 
+      // Calculate total rooms from floors
+      const calculatedTotalRooms = (editDraft.floors || []).reduce((acc: number, f: any) => acc + (f.rooms?.length || 0), 0);
+
       const payload = {
         name: editDraft.name,
         address: editDraft.address,
@@ -170,8 +174,9 @@ export default function PropertyDetail({ params }: Props) {
           ? editDraft.images
           : editDraft.images?.split(",").map((s: string) => s.trim()).filter(Boolean) || [],
         numberOfFloors: editDraft.numberOfFloors,
-        totalRooms: editDraft.totalRooms,
+        totalRooms: calculatedTotalRooms,
         status: editDraft.status,
+        floors: editDraft.floors || [],
       };
 
       const res = await fetch(`/api/owner/properties/${id}`, {
@@ -189,6 +194,7 @@ export default function PropertyDetail({ params }: Props) {
       setProperty(data.property);
       setIsEditOpen(false);
       setEditDraft(null);
+      setOriginalFloorCount(0);
       router.refresh();
     } catch (err: any) {
       console.error("Error updating property:", err);
@@ -330,7 +336,7 @@ export default function PropertyDetail({ params }: Props) {
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             <MetricCard label="Total Revenue" value={`₹${analytics.totalRevenue.toLocaleString("en-IN")}`} />
             <MetricCard label="Total Occupants" value={analytics.totalOccupants} />
-            <MetricCard label="Occupancy Rate" value={`${analytics.occupancyRate.toFixed(1)}%`} />
+            <MetricCard label="Occupancy Rate" value={`${Math.round(analytics.occupancyRate)}%`} />
             <MetricCard 
               label="Rooms Created" 
               value={`${analytics.actualRoomsCreated} / ${analytics.totalRoomsCapacity}`} 
@@ -396,7 +402,28 @@ export default function PropertyDetail({ params }: Props) {
                 <Button
                   variant="outline"
                   onClick={() => {
-                    const floors = normalizeFloors(property.floors || [], property.numberOfFloors || 1);
+                    // Merge rooms into their respective floors
+                    const floorsWithRooms = (property.floors || []).map((floor: any) => {
+                      const floorRooms = (property.rooms || [])
+                        .filter((room: any) => room.floorId === floor.id)
+                        .map((room: any) => ({
+                          id: room.id,
+                          roomNumber: room.roomNumber,
+                          roomType: room.roomType,
+                          roomCategory: room.roomCategory,
+                          capacity: room.capacity,
+                          pricePerNight: room.pricePerNight,
+                          description: room.description || "",
+                        }));
+                      return {
+                        ...floor,
+                        rooms: floorRooms,
+                      };
+                    });
+                    
+                    const floors = normalizeFloors(floorsWithRooms, property.numberOfFloors || 1);
+                    const originalFloors = property.numberOfFloors || 1;
+                    setOriginalFloorCount(originalFloors);
                     setEditDraft({ 
                       ...property, 
                       floors, 
@@ -476,15 +503,23 @@ export default function PropertyDetail({ params }: Props) {
                       <Label htmlFor="edit-images">Images (comma separated URLs)</Label>
                       <Input id="edit-images" value={(editDraft.images || []).join ? (editDraft.images || []).join(",") : editDraft.images || ""} onChange={(e) => setEditDraft((d: any) => ({ ...d, images: e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean) }))} />
                     </div>
+                  </div>
 
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                     <div>
-                      <Label htmlFor="edit-floors">Number of Floors</Label>
+                      <Label htmlFor="edit-floors">Number of Floors <span className="text-red-500">*</span></Label>
                       <div className="relative">
                         <select
                           id="edit-floors"
                           value={editDraft.numberOfFloors || 1}
                           onChange={(e) => {
                             const n = Number(e.target.value);
+                            // Prevent reducing floor count
+                            if (n < originalFloorCount) {
+                              setError(`Cannot reduce floors from ${originalFloorCount} to ${n}. You can only add more floors.`);
+                              return;
+                            }
+                            setError(null);
                             setEditDraft((d: any) => {
                               const floors = normalizeFloors(d?.floors || [], n);
                               return { ...d, numberOfFloors: floors.length, floors };
@@ -492,11 +527,27 @@ export default function PropertyDetail({ params }: Props) {
                           }}
                           className="w-full rounded border p-2 pr-8 appearance-none bg-white dark:bg-gray-800 text-black dark:text-white"
                         >
-                          {Array.from({ length: 10 }).map((_, i) => (
-                            <option key={i} value={i + 1}>{i + 1}</option>
-                          ))}
+                          {Array.from({ length: 10 }).map((_, i) => {
+                            const floorNum = i + 1;
+                            const isDisabled = floorNum < originalFloorCount;
+                            return (
+                              <option key={i} value={floorNum} disabled={isDisabled}>
+                                {floorNum} {isDisabled ? '(Cannot reduce)' : ''}
+                              </option>
+                            );
+                          })}
                         </select>
                         <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none text-muted-foreground dark:text-white" size={16} />
+                      </div>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                        ✓ Can add more floors | ✗ Cannot reduce from {originalFloorCount}
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label>Preview Total Rooms</Label>
+                      <div className="mt-2 text-lg font-semibold">
+                        {(editDraft.floors || []).reduce((acc: number, f: any) => acc + (f.rooms?.length || 0), 0)}
                       </div>
                     </div>
 
@@ -512,7 +563,13 @@ export default function PropertyDetail({ params }: Props) {
                     </div>
                   </div>
 
-                  <div className="mt-4 flex gap-2">
+                  <div className="mt-4">
+                    <p className="text-sm text-blue-600 dark:text-blue-400 mb-3">
+                      ✓ Update existing rooms | ✓ Add new rooms | ✗ Cannot remove rooms with bookings
+                    </p>
+                  </div>
+
+                  <div className="mt-2 flex gap-2">
                     <Button
                       onClick={() => {
                         setEditDraft((d: any) => {
@@ -534,7 +591,7 @@ export default function PropertyDetail({ params }: Props) {
                         "Save"
                       )}
                     </Button>
-                    <Button variant="outline" onClick={() => { setIsEditOpen(false); setError(null); }} disabled={isUpdating}>Cancel</Button>
+                    <Button variant="outline" onClick={() => { setIsEditOpen(false); setError(null); setOriginalFloorCount(0); }} disabled={isUpdating}>Cancel</Button>
                   </div>
                 </CardContent>
               </Card>
@@ -566,6 +623,10 @@ export default function PropertyDetail({ params }: Props) {
                     </Button>
                   </div>
 
+                  <p className="text-sm text-blue-600 dark:text-blue-400 mb-3">
+                    ✓ Update existing rooms | ✓ Add new rooms/floors | ✗ Cannot remove rooms with bookings or reduce below {originalFloorCount} floors
+                  </p>
+
                   <div className="space-y-2">
                     {(editDraft.floors || []).length === 0 && (
                       <p className="text-sm text-muted-foreground">No floors yet. Add a floor to begin.</p>
@@ -588,8 +649,14 @@ export default function PropertyDetail({ params }: Props) {
                             size="sm"
                             variant="ghost"
                             onClick={() => {
+                              // Prevent reducing below original floor count
+                              if (editDraft.floors.length <= originalFloorCount) {
+                                setError(`Cannot delete floor. Must maintain at least ${originalFloorCount} floors (original count).`);
+                                return;
+                              }
                               const ok = window.confirm("Delete this floor? This will remove all rooms on it.");
                               if (!ok) return;
+                              setError(null);
                               setEditDraft((d: any) => {
                                 const copy = { ...(d || {}) };
                                 const floors = [...(copy.floors || [])].filter((_: any, i: number) => i !== idx);
