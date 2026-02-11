@@ -120,10 +120,107 @@ export async function GET(
       },
       select: {
         amount: true,
+        paymentDate: true,
       },
     });
 
     const totalRevenue = allPayments.reduce((sum, payment) => sum + payment.amount, 0);
+    
+    // Calculate period-specific revenues
+    const now = new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const firstDayOfWeek = new Date(today);
+    firstDayOfWeek.setDate(today.getDate() - today.getDay());
+    
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    const firstDayOfYear = new Date(now.getFullYear(), 0, 1);
+
+    const todayRevenue = allPayments
+      .filter((p) => {
+        const paymentDate = new Date(p.paymentDate);
+        paymentDate.setHours(0, 0, 0, 0);
+        return paymentDate.getTime() === today.getTime();
+      })
+      .reduce((sum, p) => sum + p.amount, 0);
+    
+    const yesterdayRevenue = allPayments
+      .filter((p) => {
+        const paymentDate = new Date(p.paymentDate);
+        paymentDate.setHours(0, 0, 0, 0);
+        return paymentDate.getTime() === yesterday.getTime();
+      })
+      .reduce((sum, p) => sum + p.amount, 0);
+    
+    const thisWeekRevenue = allPayments
+      .filter((p) => new Date(p.paymentDate) >= firstDayOfWeek)
+      .reduce((sum, p) => sum + p.amount, 0);
+    
+    const thisMonthRevenue = allPayments
+      .filter((p) => new Date(p.paymentDate) >= firstDayOfMonth)
+      .reduce((sum, p) => sum + p.amount, 0);
+    
+    const thisYearRevenue = allPayments
+      .filter((p) => new Date(p.paymentDate) >= firstDayOfYear)
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    // Recent check-ins (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const recentCheckIns = await prisma.occupancies.count({
+      where: {
+        rooms: {
+          propertyId,
+        },
+        checkInTime: {
+          gte: sevenDaysAgo,
+        },
+      },
+    });
+
+    // Upcoming checkouts (next 3 days)
+    const threeDaysFromNow = new Date();
+    threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+
+    const upcomingCheckouts = await prisma.occupancies.count({
+      where: {
+        rooms: {
+          propertyId,
+        },
+        actualCheckOut: null,
+        expectedCheckOut: {
+          lte: threeDaysFromNow,
+          gte: new Date(),
+        },
+      },
+    });
+
+    // Get pending payments
+    const pendingPayments = await prisma.occupancies.findMany({
+      where: {
+        rooms: {
+          propertyId,
+        },
+        actualCheckOut: null,
+        balanceAmount: {
+          gt: 0,
+        },
+      },
+      select: {
+        balanceAmount: true,
+      },
+    });
+
+    const totalPendingAmount = pendingPayments.reduce(
+      (sum, occ) => sum + (occ.balanceAmount || 0),
+      0
+    );
 
     // Room status breakdown
     const roomsByType = property.rooms.reduce((acc: any, room) => {
@@ -158,8 +255,21 @@ export async function GET(
         occupancyRate: parseFloat(occupancyRate.toFixed(2)),
         totalOccupants,
         totalRevenue: parseFloat(totalRevenue.toFixed(2)),
+        todayRevenue: parseFloat(todayRevenue.toFixed(2)),
+        yesterdayRevenue: parseFloat(yesterdayRevenue.toFixed(2)),
+        thisWeekRevenue: parseFloat(thisWeekRevenue.toFixed(2)),
+        thisMonthRevenue: parseFloat(thisMonthRevenue.toFixed(2)),
+        thisYearRevenue: parseFloat(thisYearRevenue.toFixed(2)),
         unreadAlerts: property.alerts.length,
+        recentCheckIns,
+        upcomingCheckouts,
+        pendingAmount: parseFloat(totalPendingAmount.toFixed(2)),
+        pendingCount: pendingPayments.length,
         roomsByType,
+        payments: allPayments.map(p => ({
+          amount: p.amount,
+          date: p.paymentDate.toISOString(),
+        })),
       },
     };
 
@@ -239,22 +349,6 @@ export async function PUT(
       }
     }
 
-    // Validate totalRooms if being updated
-    if (totalRooms) {
-      const actualRoomsCount = await prisma.rooms.count({
-        where: { propertyId },
-      });
-
-      if (parseInt(totalRooms) < actualRoomsCount) {
-        return NextResponse.json(
-          {
-            error: `Cannot set total rooms to ${totalRooms}. Property already has ${actualRoomsCount} rooms created.`,
-          },
-          { status: 400 }
-        );
-      }
-    }
-
     // Validate numberOfFloors if being updated
     if (numberOfFloors) {
       const currentFloorsCount = await prisma.floors.count({
@@ -270,6 +364,9 @@ export async function PUT(
         );
       }
     }
+
+    // Note: totalRooms validation is skipped here as it will be automatically 
+    // calculated based on the actual rooms after floors/rooms are processed
 
     // Update property
     const updatedProperty = await prisma.properties.update({
@@ -414,6 +511,19 @@ export async function PUT(
               });
             }
           }
+
+          // Delete vacant rooms that are not in the incoming list
+          const incomingRoomNumbers = incomingRooms.map((r: any) => r.roomNumber);
+          const roomsToDelete = existingRoomsOnFloor.filter(
+            room => !incomingRoomNumbers.includes(room.roomNumber) && room.occupancies.length === 0
+          );
+          
+          for (const roomToDelete of roomsToDelete) {
+            console.log(`Deleting vacant room ${roomToDelete.roomNumber} from floor ${floorData.floorNumber}`);
+            await prisma.rooms.delete({
+              where: { id: roomToDelete.id }
+            });
+          }
         } else {
           // CREATE new floor
           console.log(`Creating new floor ${floorData.floorNumber}`);
@@ -448,6 +558,19 @@ export async function PUT(
       }
 
       console.log("=== Floor Update Complete ===");
+      
+      // Recalculate totalRooms after all room operations
+      const actualRoomsCount = await prisma.rooms.count({
+        where: { propertyId },
+      });
+      
+      // Update property with the actual room count
+      await prisma.properties.update({
+        where: { id: propertyId },
+        data: { totalRooms: actualRoomsCount }
+      });
+      
+      console.log(`Updated totalRooms to ${actualRoomsCount}`);
     }
 
     return NextResponse.json(

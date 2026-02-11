@@ -587,9 +587,9 @@ export default function RoomsPage() {
 					number: room.roomNumber,
 					type: room.type,
 					status: normalizedStatus,
-					capacity: room.capacity,
+					capacity: occupancy?.actualCapacity || room.capacity,
 					pricePerNight: room.pricePerNight,
-					guests: occupancy?.guestCount || 0,
+					guests: occupancy?.numberOfOccupants || 0,
 					floorNumber: room.floor?.floorNumber || 0,
 					paidAmount: occupancy?.paidAmount || 0,
 					bookingId: occupancy?.id ? `BK-${occupancy.id}` : undefined,
@@ -601,6 +601,8 @@ export default function RoomsPage() {
 					guestPhone: primaryGuest?.phone,
 					isGroupBooking: !!occupancy?.groupBookingId,
 					bookingSource: occupancy?.bookingSource,
+					idProofType: occupancy?.idProofType,
+					idProofNumber: occupancy?.idProofNumber,
 				};
 			});				setRooms(transformedRooms);
 			} catch (error) {
@@ -696,9 +698,9 @@ export default function RoomsPage() {
 							number: room.roomNumber,
 							type: room.type,
 							status: normalizedStatus,
-							capacity: room.capacity,
+							capacity: occupancy?.actualCapacity || room.capacity,
 							pricePerNight: room.pricePerNight,
-							guests: occupancy?.guestCount || 0,
+							guests: occupancy?.numberOfOccupants || 0,
 							floorNumber: room.floor?.floorNumber || 0,
 							paidAmount: occupancy?.paidAmount || 0,
 							bookingId: occupancy?.id ? `BK-${occupancy.id}` : undefined,
@@ -743,6 +745,7 @@ export default function RoomsPage() {
 				expectedCheckOut: checkInData.checkOutDate,
 				actualRoomRate: checkInData.pricePerNight,
 				actualCapacity: checkInData.numberOfGuests,
+				numberOfOccupants: checkInData.numberOfGuests,
 				guests: [
 					{
 						name: checkInData.guestName,
@@ -759,6 +762,10 @@ export default function RoomsPage() {
 				} : undefined,
 				bookingSource: checkInData.bookingPlatform || "WALK_IN",
 			};
+			
+			console.log("Check-in payload:", payload);
+			console.log("numberOfOccupants being sent:", payload.numberOfOccupants);
+
 
 			const response = await fetch("/api/receptionist/check-in", {
 				method: "POST",
@@ -779,9 +786,11 @@ export default function RoomsPage() {
 					const occupancy = room.currentOccupancy;
 					const primaryGuest = occupancy?.guests?.[0];
 					
-					let normalizedStatus: "occupied" | "vacant" | "maintenance" = "vacant";
+					let normalizedStatus: "occupied" | "vacant" | "maintenance" | "dirty" | "cleaning" = "vacant";
 					if (room.status === "OCCUPIED") normalizedStatus = "occupied";
 					else if (room.status === "MAINTENANCE") normalizedStatus = "maintenance";
+					else if (room.status === "DIRTY") normalizedStatus = "dirty";
+					else if (room.status === "CLEANING") normalizedStatus = "cleaning";
 					else normalizedStatus = "vacant";
 					
 					return {
@@ -789,12 +798,13 @@ export default function RoomsPage() {
 						number: room.roomNumber,
 						type: room.type,
 						status: normalizedStatus,
-						capacity: room.capacity,
+						capacity: occupancy?.actualCapacity || room.capacity,
 						pricePerNight: room.pricePerNight,
-						guests: occupancy?.guestCount || 0,
+						guests: occupancy?.numberOfOccupants || 0,
 						floorNumber: room.floor?.floorNumber || 0,
 						paidAmount: occupancy?.paidAmount || 0,
 						bookingId: occupancy?.id ? `BK-${occupancy.id}` : undefined,
+						occupancyId: occupancy?.id,
 						checkInAt: occupancy?.checkInTime,
 						expectedCheckOutDate: occupancy?.expectedCheckOut,
 						guestName: primaryGuest?.name,
@@ -802,6 +812,8 @@ export default function RoomsPage() {
 						guestPhone: primaryGuest?.phone,
 						isGroupBooking: !!occupancy?.groupBookingId,
 						bookingSource: occupancy?.bookingSource,
+						idProofType: occupancy?.idProofType,
+						idProofNumber: occupancy?.idProofNumber,
 					};
 				});
 				setRooms(transformedRooms);

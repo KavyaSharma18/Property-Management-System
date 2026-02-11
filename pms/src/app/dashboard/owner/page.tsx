@@ -7,6 +7,8 @@ import DashboardHeader from "@/components/dashboard/header";
 import Sidebar from "@/components/dashboard/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { 
   Building, 
   Home, 
@@ -16,6 +18,7 @@ import {
   DoorOpen,
   IndianRupee,
   Calendar,
+  ChevronDown,
   Loader2
 } from "lucide-react";
 
@@ -24,8 +27,10 @@ export default function OwnerDashboard() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [revenueFilter, setRevenueFilter] = useState<"all" | "thisWeek" | "thisMonth" | "thisYear" | "avgMonthly" | "custom">("all");
+  const [isRevenueDropdownOpen, setIsRevenueDropdownOpen] = useState(false);
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+  const [tempCustomRevenue, setTempCustomRevenue] = useState(0);
   
   const [overview, setOverview] = useState({
     totalProperties: 0,
@@ -43,10 +48,14 @@ export default function OwnerDashboard() {
 
   const [revenue, setRevenue] = useState({
     total: 0,
-    thisMonth: 0,
     today: 0,
+    yesterday: 0,
+    thisWeek: 0,
+    thisMonth: 0,
+    thisYear: 0,
     pendingAmount: 0,
     pendingCount: 0,
+    payments: [] as { amount: number; date: string }[],
   });
 
   const [activity, setActivity] = useState({
@@ -88,49 +97,68 @@ export default function OwnerDashboard() {
     fetchDashboardData();
   }, [session, router]);
 
-  // Calculate filtered revenue
+  // Get filtered revenue based on backend data
   const getFilteredRevenue = () => {
-    const totalRevenue = revenue.total;
-    const now = new Date();
-    
     switch (revenueFilter) {
-      case "thisWeek": {
-        const estimatedDaily = totalRevenue / 365;
-        return estimatedDaily * 7;
-      }
-      case "thisMonth": {
-        const monthsElapsed = now.getMonth() + 1;
-        return totalRevenue / Math.max(monthsElapsed, 1);
-      }
-      case "thisYear": {
-        return totalRevenue;
-      }
+      case "thisWeek":
+        return revenue.thisWeek || 0;
+      case "thisMonth":
+        return revenue.thisMonth || 0;
+      case "thisYear":
+        return revenue.thisYear || 0;
       case "avgMonthly": {
+        const now = new Date();
         const monthsElapsed = now.getMonth() + 1;
-        return totalRevenue / Math.max(monthsElapsed, 1);
+        return (revenue.thisYear || 0) / Math.max(monthsElapsed, 1);
       }
       case "custom": {
-        if (customStartDate && customEndDate) {
-          const start = new Date(customStartDate);
-          const end = new Date(customEndDate);
-          const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-          return (totalRevenue / 365) * Math.max(daysDiff, 0);
-        }
-        return totalRevenue;
+        return tempCustomRevenue;
       }
       case "all":
       default:
-        return totalRevenue;
+        return revenue.total;
+    }
+  };
+
+  const handleApplyCustomDates = () => {
+    if (customStartDate && customEndDate && revenue.payments) {
+      const start = new Date(customStartDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(customEndDate);
+      end.setHours(23, 59, 59, 999);
+      
+      if (end >= start) {
+        const calculated = revenue.payments
+          .filter((p: any) => {
+            const paymentDate = new Date(p.date);
+            return paymentDate >= start && paymentDate <= end;
+          })
+          .reduce((sum: number, p: any) => sum + p.amount, 0);
+        
+        setTempCustomRevenue(calculated);
+        setRevenueFilter("custom");
+        setIsRevenueDropdownOpen(false);
+      }
+    }
+  };
+
+  const handlePeriodSelect = (period: typeof revenueFilter) => {
+    if (period !== "custom") {
+      setRevenueFilter(period);
+      setIsRevenueDropdownOpen(false);
     }
   };
 
   const displayRevenue = getFilteredRevenue();
-  const revenueLabel = revenueFilter === "all" ? "Total Revenue" : 
-                       revenueFilter === "thisWeek" ? "This Week (Est.)" :
-                       revenueFilter === "thisMonth" ? "This Month (Est.)" :
-                       revenueFilter === "thisYear" ? "This Year" :
-                       revenueFilter === "avgMonthly" ? "Avg Monthly" :
-                       "Custom Period";
+  const revenuePeriodLabels = {
+    all: "All Time",
+    thisWeek: "This Week",
+    thisMonth: "This Month",
+    thisYear: "This Year",
+    avgMonthly: "Avg Monthly",
+    custom: "Custom Range"
+  };
+  const revenueLabel = revenuePeriodLabels[revenueFilter];
 
   if (isLoading) {
     return (
@@ -200,37 +228,77 @@ export default function OwnerDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">₹{Math.round(displayRevenue).toLocaleString('en-IN')}</div>
-                <div className="mt-3">
-                  <select
-                    value={revenueFilter}
-                    onChange={(e) => setRevenueFilter(e.target.value as any)}
-                    className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                <div className="mt-3 relative">
+                  <button
+                    onClick={() => setIsRevenueDropdownOpen(!isRevenueDropdownOpen)}
+                    className="w-full flex items-center justify-between px-3 py-2 text-sm bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-100 rounded-md hover:bg-blue-100 dark:hover:bg-blue-800 transition-colors"
                   >
-                    <option value="all">All Time</option>
-                    <option value="thisWeek">This Week</option>
-                    <option value="thisMonth">This Month</option>
-                    <option value="thisYear">This Year</option>
-                    <option value="avgMonthly">Average Monthly</option>
-                    <option value="custom">Custom Dates</option>
-                  </select>
+                    {revenueLabel}
+                    <ChevronDown size={16} className={`transition-transform ${isRevenueDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {isRevenueDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setIsRevenueDropdownOpen(false)} />
+                      <div className="absolute left-0 right-0 mt-1 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-20 max-h-96 overflow-y-auto">
+                        <div className="py-1">
+                          {(['all', 'thisWeek', 'thisMonth', 'thisYear', 'avgMonthly'] as const).map((period) => (
+                            <button
+                              key={period}
+                              onClick={() => handlePeriodSelect(period)}
+                              className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                                revenueFilter === period ? 'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-100 font-medium' : 'text-gray-700 dark:text-gray-200'
+                              }`}
+                            >
+                              {revenuePeriodLabels[period]}
+                            </button>
+                          ))}
+                          
+                          <div className="border-t dark:border-gray-700 mt-1 pt-2 px-4 pb-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Calendar size={14} className="text-blue-600 dark:text-blue-400" />
+                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">Custom Range</span>
+                            </div>
+                            <div className="space-y-2">
+                              <div>
+                                <Label htmlFor="startDate" className="text-xs">From</Label>
+                                <Input
+                                  id="startDate"
+                                  type="date"
+                                  value={customStartDate}
+                                  onChange={(e) => setCustomStartDate(e.target.value)}
+                                  className="h-8 text-xs"
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="endDate" className="text-xs">To</Label>
+                                <Input
+                                  id="endDate"
+                                  type="date"
+                                  value={customEndDate}
+                                  onChange={(e) => setCustomEndDate(e.target.value)}
+                                  min={customStartDate}
+                                  className="h-8 text-xs"
+                                />
+                              </div>
+                              <button
+                                onClick={handleApplyCustomDates}
+                                disabled={!customStartDate || !customEndDate}
+                                className="w-full px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+                              >
+                                Apply
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
-                {revenueFilter === "custom" && (
-                  <div className="mt-2 space-y-1">
-                    <input
-                      type="date"
-                      value={customStartDate}
-                      onChange={(e) => setCustomStartDate(e.target.value)}
-                      placeholder="Start Date"
-                      className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100"
-                    />
-                    <input
-                      type="date"
-                      value={customEndDate}
-                      onChange={(e) => setCustomEndDate(e.target.value)}
-                      placeholder="End Date"
-                      className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100"
-                    />
-                  </div>
+                {revenueFilter === 'custom' && customStartDate && customEndDate && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {new Date(customStartDate).toLocaleDateString('en-IN')} - {new Date(customEndDate).toLocaleDateString('en-IN')}
+                  </p>
                 )}
               </CardContent>
             </Card>

@@ -89,7 +89,18 @@ export async function GET(req: NextRequest) {
           where: {
             actualCheckOut: null,
           },
-          include: {
+          select: {
+            id: true,
+            checkInTime: true,
+            expectedCheckOut: true,
+            actualRoomRate: true,
+            actualCapacity: true,
+            paidAmount: true,
+            totalAmount: true,
+            balanceAmount: true,
+            numberOfOccupants: true,
+            groupBookingId: true,
+            bookingSource: true,
             occupancy_guests: {
               include: {
                 guests: {
@@ -98,6 +109,8 @@ export async function GET(req: NextRequest) {
                     name: true,
                     email: true,
                     phone: true,
+                    idProofType: true,
+                    idProofNumber: true,
                   },
                 },
               },
@@ -136,6 +149,9 @@ export async function GET(req: NextRequest) {
       const guests = currentOccupancy
         ? currentOccupancy.occupancy_guests.map((og: any) => og.guests)
         : [];
+      
+      // Get primary guest (first guest in the list)
+      const primaryGuest = guests[0] || null;
 
       // Recalculate amounts for active occupancies
       let recalculatedTotal = currentOccupancy?.totalAmount || 0;
@@ -169,9 +185,12 @@ export async function GET(req: NextRequest) {
               totalAmount: recalculatedTotal,
               paidAmount: currentOccupancy.paidAmount,
               balanceAmount: recalculatedBalance,
+              numberOfOccupants: currentOccupancy.numberOfOccupants,
               guestCount: guests.length,
               guests: guests,
               bookingSource: currentOccupancy.bookingSource,
+              idProofType: primaryGuest?.idProofType,
+              idProofNumber: primaryGuest?.idProofNumber,
             }
           : null,
       };

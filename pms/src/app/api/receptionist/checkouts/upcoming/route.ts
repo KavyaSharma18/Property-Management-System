@@ -151,6 +151,7 @@ export async function GET(req: NextRequest) {
         isPaid: (occ.balanceAmount || 0) === 0,
         canCheckout: (occ.balanceAmount || 0) === 0,
         primaryGuest: primaryGuest ? primaryGuest.guests : null,
+        numberOfOccupants: occ.numberOfOccupants,
         guestCount: occ.occupancy_guests.length,
         allGuests: occ.occupancy_guests.map((og: any) => ({
           ...og.guests,

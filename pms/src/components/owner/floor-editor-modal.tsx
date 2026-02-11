@@ -16,6 +16,7 @@ interface RoomDraft {
   capacity: number;
   pricePerNight: number;
   description?: string;
+  isOccupied?: boolean;
 }
 
 interface FloorDraft {
@@ -117,6 +118,7 @@ export default function FloorEditorModal({ isOpen, onClose, floor, onSave }: Flo
       capacity: 1,
       pricePerNight: 0,
       description: "",
+      isOccupied: false,
     };
     setDraft((d) => ({ ...d, rooms: [...d.rooms, newRoom] }));
   };
@@ -209,6 +211,12 @@ export default function FloorEditorModal({ isOpen, onClose, floor, onSave }: Flo
                   Add Room
                 </Button>
               </div>
+              
+              {draft.rooms.some(r => r.isOccupied) && (
+                <div className="mb-3 p-2 bg-blue-100 dark:bg-blue-900/20 border border-blue-500 dark:border-blue-700 rounded text-xs text-blue-800 dark:text-blue-200">
+                  ℹ️ Occupied rooms cannot be removed. Please check out guests before removing rooms.
+                </div>
+              )}
 
               {isLoadingEnums ? (
                 <div className="flex items-center justify-center py-8">
@@ -224,12 +232,19 @@ export default function FloorEditorModal({ isOpen, onClose, floor, onSave }: Flo
                     
                     return (
                       <div key={room.id} className={`p-3 border rounded ${
-                        isDuplicate 
+                        room.isOccupied
+                          ? "border-blue-500 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/10"
+                          : isDuplicate 
                           ? "border-red-500 dark:border-red-700 bg-red-50 dark:bg-red-900/10" 
                           : !isValid 
                             ? "border-yellow-500 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/10"
                             : "dark:border-gray-700"
                       }`}>
+                        {room.isOccupied && (
+                          <div className="mb-2 px-2 py-1 bg-blue-600 text-white text-xs font-semibold rounded inline-block">
+                            🔒 OCCUPIED - Cannot Remove
+                          </div>
+                        )}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
                           <div>
                             <Label>
@@ -317,7 +332,15 @@ export default function FloorEditorModal({ isOpen, onClose, floor, onSave }: Flo
                           )}
                         </div>
                         <div className="flex items-end">
-                          <Button type="button" variant="destructive" onClick={() => removeRoom(room.id)}>Remove</Button>
+                          <Button 
+                            type="button" 
+                            variant="destructive" 
+                            onClick={() => removeRoom(room.id)}
+                            disabled={room.isOccupied}
+                            title={room.isOccupied ? "Cannot remove occupied rooms" : "Remove room"}
+                          >
+                            {room.isOccupied ? "Occupied - Cannot Remove" : "Remove"}
+                          </Button>
                         </div>
                       </div>
 

@@ -11,7 +11,7 @@ import ManageReceptionistModal from "@/components/owner/manage-receptionist-moda
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import FloorEditorModal from "@/components/owner/floor-editor-modal";
-import { ChevronDown, Loader2, AlertCircle } from "lucide-react";
+import { ChevronDown, Loader2, AlertCircle, Calendar, LogIn, LogOut, IndianRupee } from "lucide-react";
 
 interface Receptionist {
   id: string;
@@ -55,8 +55,18 @@ interface Property {
     occupancyRate: number;
     totalOccupants: number;
     totalRevenue: number;
+    todayRevenue: number;
+    yesterdayRevenue: number;
+    thisWeekRevenue: number;
+    thisMonthRevenue: number;
+    thisYearRevenue: number;
     unreadAlerts: number;
+    recentCheckIns: number;
+    upcomingCheckouts: number;
+    pendingAmount: number;
+    pendingCount: number;
     roomsByType?: any;
+    payments?: { amount: number; date: string }[];
   };
 }
 
@@ -82,8 +92,10 @@ export default function PropertyDetail({ params }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [revenueFilter, setRevenueFilter] = useState<"all" | "thisWeek" | "thisMonth" | "thisYear" | "avgMonthly" | "custom">("all");
+  const [isRevenueDropdownOpen, setIsRevenueDropdownOpen] = useState(false);
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+  const [tempCustomRevenue, setTempCustomRevenue] = useState(0);
 
   // Fetch property data from API
   useEffect(() => {
@@ -170,12 +182,6 @@ export default function PropertyDetail({ params }: Props) {
         zipCode: editDraft.zipCode,
         country: editDraft.country,
         description: editDraft.description,
-        amenities: Array.isArray(editDraft.amenities) 
-          ? editDraft.amenities 
-          : editDraft.amenities?.split(",").map((s: string) => s.trim()).filter(Boolean) || [],
-        images: Array.isArray(editDraft.images)
-          ? editDraft.images
-          : editDraft.images?.split(",").map((s: string) => s.trim()).filter(Boolean) || [],
         numberOfFloors: editDraft.numberOfFloors,
         totalRooms: calculatedTotalRooms,
         status: editDraft.status,
@@ -270,57 +276,83 @@ export default function PropertyDetail({ params }: Props) {
     occupancyRate: 0,
     totalOccupants: 0,
     totalRevenue: 0,
+    todayRevenue: 0,
+    yesterdayRevenue: 0,
+    thisWeekRevenue: 0,
+    thisMonthRevenue: 0,
+    thisYearRevenue: 0,
     unreadAlerts: 0,
+    recentCheckIns: 0,
+    upcomingCheckouts: 0,
+    pendingAmount: 0,
+    pendingCount: 0,
+    payments: [] as { amount: number; date: string }[],
   };
 
   // Calculate filtered revenue
   const getFilteredRevenue = () => {
-    const totalRevenue = analytics.totalRevenue;
-    const now = new Date();
+    if (!analytics) return 0;
     
     switch (revenueFilter) {
-      case "thisWeek": {
-        // Estimate weekly revenue based on daily average
-        const estimatedDaily = totalRevenue / 365;
-        return estimatedDaily * 7;
-      }
-      case "thisMonth": {
-        // Estimate monthly revenue
-        const monthsElapsed = now.getMonth() + 1;
-        return totalRevenue / Math.max(monthsElapsed, 1);
-      }
-      case "thisYear": {
-        // Current year revenue
-        return totalRevenue;
-      }
+      case "thisWeek":
+        return analytics.thisWeekRevenue || 0;
+      case "thisMonth":
+        return analytics.thisMonthRevenue || 0;
+      case "thisYear":
+        return analytics.thisYearRevenue || 0;
       case "avgMonthly": {
-        // Average monthly revenue
+        const now = new Date();
         const monthsElapsed = now.getMonth() + 1;
-        return totalRevenue / Math.max(monthsElapsed, 1);
+        return (analytics.thisYearRevenue || 0) / Math.max(monthsElapsed, 1);
       }
       case "custom": {
-        if (customStartDate && customEndDate) {
-          const start = new Date(customStartDate);
-          const end = new Date(customEndDate);
-          const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-          // Estimate based on daily average
-          return (totalRevenue / 365) * Math.max(daysDiff, 0);
-        }
-        return totalRevenue;
+        return tempCustomRevenue;
       }
       case "all":
       default:
-        return totalRevenue;
+        return analytics.totalRevenue || 0;
+    }
+  };
+
+  const handleApplyCustomDates = () => {
+    if (customStartDate && customEndDate && analytics?.payments) {
+      const start = new Date(customStartDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(customEndDate);
+      end.setHours(23, 59, 59, 999);
+      
+      if (end >= start) {
+        const calculated = analytics.payments
+          .filter((p: any) => {
+            const paymentDate = new Date(p.date);
+            return paymentDate >= start && paymentDate <= end;
+          })
+          .reduce((sum: number, p: any) => sum + p.amount, 0);
+        
+        setTempCustomRevenue(calculated);
+        setRevenueFilter("custom");
+        setIsRevenueDropdownOpen(false);
+      }
+    }
+  };
+
+  const handlePeriodSelect = (period: typeof revenueFilter) => {
+    if (period !== "custom") {
+      setRevenueFilter(period);
+      setIsRevenueDropdownOpen(false);
     }
   };
 
   const displayRevenue = getFilteredRevenue();
-  const revenueLabel = revenueFilter === "all" ? "Total Revenue" : 
-                       revenueFilter === "thisWeek" ? "This Week (Est.)" :
-                       revenueFilter === "thisMonth" ? "This Month (Est.)" :
-                       revenueFilter === "thisYear" ? "This Year" :
-                       revenueFilter === "avgMonthly" ? "Avg Monthly" :
-                       "Custom Period";
+  const revenuePeriodLabels = {
+    all: "All Time",
+    thisWeek: "This Week",
+    thisMonth: "This Month",
+    thisYear: "This Year",
+    avgMonthly: "Avg Monthly",
+    custom: "Custom Range"
+  };
+  const revenueLabel = revenuePeriodLabels[revenueFilter];
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -389,41 +421,78 @@ export default function PropertyDetail({ params }: Props) {
             {/* Revenue Card with Filter */}
             <Card className="md:col-span-2 lg:col-span-1">
               <CardContent>
-                <div className="mb-2">
-                  <p className="text-sm text-muted-foreground">{revenueLabel}</p>
-                  <p className="text-2xl font-bold">₹{Math.round(displayRevenue).toLocaleString("en-IN")}</p>
-                </div>
-                <div className="mt-3">
-                  <select
-                    value={revenueFilter}
-                    onChange={(e) => setRevenueFilter(e.target.value as any)}
-                    className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                <div className="text-2xl font-bold">₹{Math.round(displayRevenue).toLocaleString("en-IN")}</div>
+                <div className="mt-3 relative">
+                  <button
+                    onClick={() => setIsRevenueDropdownOpen(!isRevenueDropdownOpen)}
+                    className="w-full flex items-center justify-between px-3 py-2 text-sm bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-100 rounded-md hover:bg-blue-100 dark:hover:bg-blue-800 transition-colors"
                   >
-                    <option value="all">All Time</option>
-                    <option value="thisWeek">This Week</option>
-                    <option value="thisMonth">This Month</option>
-                    <option value="thisYear">This Year</option>
-                    <option value="avgMonthly">Average Monthly</option>
-                    <option value="custom">Custom Dates</option>
-                  </select>
+                    {revenueLabel}
+                    <ChevronDown size={16} className={`transition-transform ${isRevenueDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {isRevenueDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setIsRevenueDropdownOpen(false)} />
+                      <div className="absolute left-0 right-0 mt-1 bg-white dark:bg-gray-800 rounded-md shadow-lg border border-gray-200 dark:border-gray-700 z-20 max-h-96 overflow-y-auto">
+                        <div className="py-1">
+                          {(['all', 'thisWeek', 'thisMonth', 'thisYear', 'avgMonthly'] as const).map((period) => (
+                            <button
+                              key={period}
+                              onClick={() => handlePeriodSelect(period)}
+                              className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                                revenueFilter === period ? 'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-100 font-medium' : 'text-gray-700 dark:text-gray-200'
+                              }`}
+                            >
+                              {revenuePeriodLabels[period]}
+                            </button>
+                          ))}
+                          
+                          <div className="border-t dark:border-gray-700 mt-1 pt-2 px-4 pb-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Calendar size={14} className="text-blue-600 dark:text-blue-400" />
+                              <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">Custom Range</span>
+                            </div>
+                            <div className="space-y-2">
+                              <div>
+                                <Label htmlFor="startDate" className="text-xs">From</Label>
+                                <Input
+                                  id="startDate"
+                                  type="date"
+                                  value={customStartDate}
+                                  onChange={(e) => setCustomStartDate(e.target.value)}
+                                  className="h-8 text-xs"
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="endDate" className="text-xs">To</Label>
+                                <Input
+                                  id="endDate"
+                                  type="date"
+                                  value={customEndDate}
+                                  onChange={(e) => setCustomEndDate(e.target.value)}
+                                  min={customStartDate}
+                                  className="h-8 text-xs"
+                                />
+                              </div>
+                              <button
+                                onClick={handleApplyCustomDates}
+                                disabled={!customStartDate || !customEndDate}
+                                className="w-full px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
+                              >
+                                Apply
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
-                {revenueFilter === "custom" && (
-                  <div className="mt-2 space-y-1">
-                    <input
-                      type="date"
-                      value={customStartDate}
-                      onChange={(e) => setCustomStartDate(e.target.value)}
-                      placeholder="Start Date"
-                      className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100"
-                    />
-                    <input
-                      type="date"
-                      value={customEndDate}
-                      onChange={(e) => setCustomEndDate(e.target.value)}
-                      placeholder="End Date"
-                      className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100"
-                    />
-                  </div>
+                {revenueFilter === 'custom' && customStartDate && customEndDate && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {new Date(customStartDate).toLocaleDateString('en-IN')} - {new Date(customEndDate).toLocaleDateString('en-IN')}
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -435,6 +504,48 @@ export default function PropertyDetail({ params }: Props) {
             />
             <MetricCard label="Occupied Rooms" value={analytics.occupiedRooms} />
             <MetricCard label="Vacant Rooms" value={analytics.vacantRooms} />
+          </div>
+
+          {/* Activity & Payments Metrics */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-6">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Recent Check-ins</p>
+                    <p className="text-3xl font-bold">{analytics.recentCheckIns}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Last 7 days</p>
+                  </div>
+                  <LogIn className="text-blue-600 dark:text-blue-400" size={24} />
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Upcoming Checkouts</p>
+                    <p className="text-3xl font-bold">{analytics.upcomingCheckouts}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Next 3 days</p>
+                  </div>
+                  <LogOut className="text-orange-600 dark:text-orange-400" size={24} />
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Pending Payments</p>
+                    <p className="text-3xl font-bold">₹{Math.round(analytics.pendingAmount).toLocaleString('en-IN')}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{analytics.pendingCount} payments pending</p>
+                  </div>
+                  <IndianRupee className="text-red-600 dark:text-red-400" size={24} />
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Room Creation Progress */}
@@ -506,6 +617,7 @@ export default function PropertyDetail({ params }: Props) {
                           capacity: room.capacity,
                           pricePerNight: room.pricePerNight,
                           description: room.description || "",
+                          isOccupied: room.occupancies && room.occupancies.length > 0,
                         }));
                       return {
                         ...floor,
@@ -520,8 +632,6 @@ export default function PropertyDetail({ params }: Props) {
                       ...property, 
                       floors, 
                       numberOfFloors: floors.length,
-                      amenities: Array.isArray(property.amenities) ? property.amenities.join(",") : (property.amenities || ""),
-                      images: Array.isArray(property.images) ? property.images.join(",") : (property.images || ""),
                     });
                     setIsEditOpen(true);
                   }}
@@ -584,16 +694,6 @@ export default function PropertyDetail({ params }: Props) {
                     <div className="md:col-span-2">
                       <Label htmlFor="edit-description">Description</Label>
                       <Input id="edit-description" value={editDraft.description || ""} onChange={(e) => setEditDraft((d: any) => ({ ...d, description: e.target.value }))} />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="edit-amenities">Amenities (comma separated)</Label>
-                      <Input id="edit-amenities" value={(editDraft.amenities || []).join ? (editDraft.amenities || []).join(",") : editDraft.amenities || ""} onChange={(e) => setEditDraft((d: any) => ({ ...d, amenities: e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean) }))} />
-                    </div>
-
-                    <div>
-                      <Label htmlFor="edit-images">Images (comma separated URLs)</Label>
-                      <Input id="edit-images" value={(editDraft.images || []).join ? (editDraft.images || []).join(",") : editDraft.images || ""} onChange={(e) => setEditDraft((d: any) => ({ ...d, images: e.target.value.split(",").map((s: string) => s.trim()).filter(Boolean) }))} />
                     </div>
                   </div>
 

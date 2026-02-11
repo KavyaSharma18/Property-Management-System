@@ -144,8 +144,6 @@ export default function PropertiesList({ initial = [] }: { initial?: Property[] 
         zipCode: zipCode.trim() || undefined,
         country: country.trim() || "India",
         description: description.trim() || undefined,
-        amenities: parsedAmenities.length > 0 ? parsedAmenities : undefined,
-        images: parsedImages.length > 0 ? parsedImages : undefined,
         numberOfFloors: numberOfFloors,
         totalRooms: calculatedTotalRooms,
         floors: floors.map((floor) => ({
@@ -244,53 +242,67 @@ export default function PropertiesList({ initial = [] }: { initial?: Property[] 
     });
   };
 
-  const handleEdit = (property: Property) => {
-    setEditingProperty(property);
-    setName(property.name);
-    setAddress(property.address);
-    setDescription(property.description || "");
-    setCity(property.city || "");
-    setStateVal(property.state || "");
-    setZipCode(property.zipCode || "");
-    setCountry(property.country || "India");
-    
-    // Parse amenities and images
-    const amenitiesArr = parseArrayField(property.amenities);
-    const imagesArr = parseArrayField(property.images);
-    setAmenities(amenitiesArr.join(", "));
-    setImages(imagesArr.join(", "));
-    
-    // Store original floor count to prevent reduction
-    const originalFloors = property.numberOfFloors || 1;
-    setOriginalFloorCount(originalFloors);
-    setNumberOfFloors(originalFloors);
-    setTotalRooms(property.totalRooms || 0);
-    
-    // Load floors data and map to the correct format
-    if (property.floors && property.floors.length > 0) {
-      const mappedFloors = property.floors.map((floor: any) => ({
-        floorNumber: floor.floorNumber,
-        floorName: floor.floorName || `Floor ${floor.floorNumber}`,
-        description: floor.description || "",
-        rooms: (floor.rooms || []).map((room: any) => ({
-          id: room.id || `r_${Date.now()}_${Math.random()}`,
-          roomNumber: room.roomNumber,
-          roomType: room.roomType,
-          roomCategory: room.roomCategory,
-          capacity: room.capacity,
-          pricePerNight: room.pricePerNight,
-          description: room.description || "",
-          amenities: parseArrayField(room.amenities),
-          images: parseArrayField(room.images),
-        })),
-      }));
-      setFloors(mappedFloors);
-    } else {
-      ensureFloors(property.numberOfFloors || 1);
+  const handleEdit = async (property: Property) => {
+    try {
+      // Fetch detailed property information with occupancies
+      const res = await fetch(`/api/owner/properties/${property.id}`);
+      if (!res.ok) {
+        throw new Error("Failed to fetch property details");
+      }
+      const data = await res.json();
+      const detailedProperty = data.property;
+
+      setEditingProperty(detailedProperty);
+      setName(detailedProperty.name);
+      setAddress(detailedProperty.address);
+      setDescription(detailedProperty.description || "");
+      setCity(detailedProperty.city || "");
+      setStateVal(detailedProperty.state || "");
+      setZipCode(detailedProperty.zipCode || "");
+      setCountry(detailedProperty.country || "India");
+      // Store original floor count to prevent reduction
+      const originalFloors = detailedProperty.numberOfFloors || 1;
+      setOriginalFloorCount(originalFloors);
+      setNumberOfFloors(originalFloors);
+      setTotalRooms(detailedProperty.totalRooms || 0);
+      
+      // Load floors data and map to the correct format
+      if (detailedProperty.floors && detailedProperty.floors.length > 0) {
+        const mappedFloors = detailedProperty.floors.map((floor: any) => {
+          // Get rooms for this floor from the property.rooms array
+          const floorRooms = (detailedProperty.rooms || [])
+            .filter((room: any) => room.floorId === floor.id)
+            .map((room: any) => ({
+              id: room.id || `r_${Date.now()}_${Math.random()}`,
+              roomNumber: room.roomNumber,
+              roomType: room.roomType,
+              roomCategory: room.roomCategory,
+              capacity: room.capacity,
+              pricePerNight: room.pricePerNight,
+              description: room.description || "",
+              amenities: parseArrayField(room.amenities),
+              images: parseArrayField(room.images),
+              isOccupied: room.occupancies && room.occupancies.length > 0,
+            }));
+          
+          return {
+            floorNumber: floor.floorNumber,
+            floorName: floor.floorName || `Floor ${floor.floorNumber}`,
+            description: floor.description || "",
+            rooms: floorRooms,
+          };
+        });
+        setFloors(mappedFloors);
+      } else {
+        ensureFloors(detailedProperty.numberOfFloors || 1);
+      }
+      
+      setShowForm(true);
+      setError(null);
+    } catch (error) {
+      console.error("Failed to load property for editing:", error);
+      toast.error("Failed to load property details");
     }
-    
-    setShowForm(true);
-    setError(null);
   };
 
   const handleDeleteProperty = async (id: string) => {
@@ -407,18 +419,6 @@ export default function PropertiesList({ initial = [] }: { initial?: Property[] 
             <Input id="description" value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="amenities">Amenities (comma separated)</Label>
-              <Input id="amenities" value={amenities} onChange={(e) => setAmenities(e.target.value)} />
-            </div>
-
-            <div>
-              <Label htmlFor="images">Images (comma separated URLs)</Label>
-              <Input id="images" value={images} onChange={(e) => setImages(e.target.value)} />
-            </div>
-          </div>
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="floors">Number of Floors <span className="text-red-500">*</span></Label>
@@ -441,7 +441,7 @@ export default function PropertiesList({ initial = [] }: { initial?: Property[] 
                   {Array.from({ length: 10 }).map((_, i) => {
                     const floorNum = i + 1;
                     // When editing, disable options below original count
-                    const isDisabled = editingProperty && floorNum < originalFloorCount;
+                    const isDisabled = !!(editingProperty && floorNum < originalFloorCount);
                     return (
                       <option key={i} value={floorNum} disabled={isDisabled}>
                         {floorNum} {isDisabled ? '(Cannot reduce)' : ''}

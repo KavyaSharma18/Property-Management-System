@@ -75,15 +75,23 @@ export default async function ReceptionistDashboard() {
   const vacantRooms = rooms.filter(r => r.status === "VACANT").length;
   const occupiedRooms = rooms.filter(r => r.status === "OCCUPIED").length;
 
-  // Get active occupancies for guest count
-  const activeOccupancies = await prisma.occupancies.count({
+  // Get total guest count by summing numberOfOccupants from active occupancies
+  const activeOccupanciesData = await prisma.occupancies.findMany({
     where: {
       rooms: {
         propertyId: receptionist.propertyId,
       },
       actualCheckOut: null,
     },
+    select: {
+      numberOfOccupants: true,
+    },
   });
+
+  const totalGuests = activeOccupanciesData.reduce(
+    (sum, occ) => sum + (occ.numberOfOccupants || 0),
+    0
+  );
 
   // Calculate occupancy rate
   const occupancyRate = totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0;
@@ -171,7 +179,7 @@ export default async function ReceptionistDashboard() {
                   <h3 className="font-semibold text-sm">Total Guests</h3>
                   <Users className="text-purple-500" size={20} />
                 </div>
-                <p className="text-3xl font-bold text-purple-600">{activeOccupancies}</p>
+                <p className="text-3xl font-bold text-purple-600">{totalGuests}</p>
                 <p className="text-sm text-muted-foreground mt-2">Currently staying</p>
               </CardContent>
             </Card>

@@ -92,16 +92,21 @@ export async function GET(req: NextRequest) {
 
     const totalRevenue = allPayments.reduce((sum, p) => sum + p.amount, 0);
 
-    // This month's revenue
     const now = new Date();
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const thisMonthRevenue = allPayments
-      .filter((p) => p.paymentDate >= firstDayOfMonth)
-      .reduce((sum, p) => sum + p.amount, 0);
-
-    // Today's revenue
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const firstDayOfWeek = new Date(today);
+    firstDayOfWeek.setDate(today.getDate() - today.getDay());
+    
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    const firstDayOfYear = new Date(now.getFullYear(), 0, 1);
+
+    // Calculate revenues for different periods
     const todayRevenue = allPayments
       .filter((p) => {
         const paymentDate = new Date(p.paymentDate);
@@ -109,10 +114,30 @@ export async function GET(req: NextRequest) {
         return paymentDate.getTime() === today.getTime();
       })
       .reduce((sum, p) => sum + p.amount, 0);
+    
+    const yesterdayRevenue = allPayments
+      .filter((p) => {
+        const paymentDate = new Date(p.paymentDate);
+        paymentDate.setHours(0, 0, 0, 0);
+        return paymentDate.getTime() === yesterday.getTime();
+      })
+      .reduce((sum, p) => sum + p.amount, 0);
+    
+    const thisWeekRevenue = allPayments
+      .filter((p) => p.paymentDate >= firstDayOfWeek)
+      .reduce((sum, p) => sum + p.amount, 0);
+    
+    const thisMonthRevenue = allPayments
+      .filter((p) => p.paymentDate >= firstDayOfMonth)
+      .reduce((sum, p) => sum + p.amount, 0);
+    
+    const thisYearRevenue = allPayments
+      .filter((p) => p.paymentDate >= firstDayOfYear)
+      .reduce((sum, p) => sum + p.amount, 0);
 
-    // Active occupancies count
+    // Total guests count by summing numberOfOccupants from active occupancies
     const activeOccupancies = properties.reduce(
-      (sum, p) => sum + p.rooms.reduce((count, r) => count + r.occupancies.length, 0),
+      (sum, p) => sum + p.rooms.reduce((count, r) => count + r.occupancies.reduce((guestSum, occ) => guestSum + (occ.numberOfOccupants || 0), 0), 0),
       0
     );
 
@@ -219,10 +244,17 @@ export async function GET(req: NextRequest) {
       },
       revenue: {
         total: totalRevenue,
-        thisMonth: thisMonthRevenue,
         today: todayRevenue,
+        yesterday: yesterdayRevenue,
+        thisWeek: thisWeekRevenue,
+        thisMonth: thisMonthRevenue,
+        thisYear: thisYearRevenue,
         pendingAmount: totalPendingAmount,
         pendingCount: pendingPayments.length,
+        payments: allPayments.map(p => ({
+          amount: p.amount,
+          date: p.paymentDate.toISOString(),
+        })),
       },
       activity: {
         recentCheckIns,

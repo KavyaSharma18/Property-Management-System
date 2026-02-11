@@ -34,12 +34,16 @@ export async function POST(req: NextRequest) {
       expectedCheckOut,
       actualRoomRate,
       actualCapacity,
+      numberOfOccupants,
       guests, // Array of guest objects with guest details
       initialPayment, // { amount, paymentMethod, transactionId }
       groupBookingId, // Optional
       bookingSource, // Optional: Source of booking (WALK_IN, CORPORATE, etc.)
       corporateBookingId, // Optional: Link to corporate booking
     } = body;
+    
+    console.log("Extracted numberOfOccupants:", numberOfOccupants);
+
 
     // Validation
     if (!roomId || !checkInTime || !actualRoomRate || !guests || guests.length === 0) {
@@ -231,8 +235,8 @@ export async function POST(req: NextRequest) {
             ? new Date(expectedCheckOut)
             : null,
           actualRoomRate,
-          numberOfOccupants: createdGuests.length,
-          actualCapacity: actualCapacity || createdGuests.length,
+          numberOfOccupants: numberOfOccupants || createdGuests.length,
+          actualCapacity: actualCapacity || numberOfOccupants || createdGuests.length,
           totalAmount,
           paidAmount,
           balanceAmount,
@@ -242,6 +246,8 @@ export async function POST(req: NextRequest) {
           corporateBookingId: corporateBookingId || null, // Link to corporate if provided
         },
       });
+      
+      console.log("Created occupancy with numberOfOccupants:", occupancy.numberOfOccupants);
 
       // Link guests to occupancy
       await tx.occupancy_guests.createMany({

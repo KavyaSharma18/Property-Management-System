@@ -2,7 +2,6 @@
 
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-import { Github } from "lucide-react";
 
 export function OAuthButtons() {
   return (
@@ -32,16 +31,6 @@ export function OAuthButtons() {
           />
         </svg>
         Continue with Google
-      </Button>
-
-      <Button
-        variant="outline"
-        type="button"
-        onClick={() => signIn("github", { callbackUrl: "/dashboard" })}
-        className="w-full"
-      >
-        <Github className="mr-2 h-4 w-4" />
-        Continue with GitHub
       </Button>
     </div>
   );
