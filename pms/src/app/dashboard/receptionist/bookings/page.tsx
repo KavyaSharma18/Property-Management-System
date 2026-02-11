@@ -19,6 +19,8 @@ interface Booking {
   rooms: string[];
   checkInDate: string;
   checkOutDate: string;
+  bookingSource?: string;
+  isCorporate?: boolean;
 }
 
 const calculateDays = (checkInDate: string, checkOutDate: string) => {
@@ -66,6 +68,8 @@ export default function ManageBookingsPage() {
             rooms: [occ.room?.roomNumber || "N/A"],
             checkInDate: occ.checkInDate ? new Date(occ.checkInDate).toISOString().split('T')[0] : "",
             checkOutDate: occ.expectedCheckOut ? new Date(occ.expectedCheckOut).toISOString().split('T')[0] : "",
+            bookingSource: occ.bookingSource || "WALK_IN",
+            isCorporate: !!occ.corporateBookingId || occ.bookingSource === "CORPORATE",
           };
         });
         
@@ -204,35 +208,49 @@ export default function ManageBookingsPage() {
           <div className="grid gap-4">
             {filteredBookings.map((booking) => (
               <Card key={booking.id}>
-                <CardContent className="p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Booking ID</p>
-                    <p className="text-lg font-semibold">{booking.id}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {booking.guestName}
-                    </p>
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center">
+                    {/* Booking ID & Guest */}
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Booking ID</p>
+                      <p className="text-lg font-semibold">{booking.id}</p>
+                      <p className="text-sm text-muted-foreground">{booking.guestName}</p>
+                      {booking.isCorporate && (
+                        <span className="inline-block px-2 py-0.5 text-xs font-medium bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded">
+                          CORPORATE
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* ID Proof & Rooms */}
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">ID Proof</p>
+                      <p className="text-sm font-medium">{booking.idProofType} • {booking.idProofNumber}</p>
+                      <p className="text-sm text-muted-foreground">Rooms: {booking.rooms.join(", ")}</p>
+                    </div>
+                    
+                    {/* Booking Source & Duration */}
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Booking Source</p>
+                      <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                        {(booking.bookingSource || 'WALK_IN').replace(/_/g, ' ')}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {calculateDays(booking.checkInDate, booking.checkOutDate)} days
+                      </p>
+                    </div>
+                    
+                    {/* Dates & Action */}
+                    <div className="space-y-1 flex flex-col items-start md:items-end">
+                      <p className="text-xs text-muted-foreground">Check-in → Check-out</p>
+                      <p className="text-sm font-medium">
+                        {booking.checkInDate} → {booking.checkOutDate}
+                      </p>
+                      <Button variant="outline" onClick={() => openEditModal(booking)} className="mt-2">
+                        Edit Booking
+                      </Button>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">ID Proof</p>
-                    <p className="text-sm font-medium">
-                      {booking.idProofType} • {booking.idProofNumber}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      Rooms: {booking.rooms.join(", ")}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Booked For</p>
-                    <p className="text-sm font-medium">
-                      {calculateDays(booking.checkInDate, booking.checkOutDate)} days
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {booking.checkInDate} → {booking.checkOutDate}
-                    </p>
-                  </div>
-                  <Button variant="outline" onClick={() => openEditModal(booking)}>
-                    Edit Booking
-                  </Button>
                 </CardContent>
               </Card>
             ))}

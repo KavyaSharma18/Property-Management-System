@@ -23,9 +23,9 @@ interface GroupBooking {
 	contactEmail: string;
 	status: string;
 	roomsBooked: number;
-	roomsPending: number;
 	isCorporate?: boolean;
 	rooms?: { roomNumber: string; status: string }[];
+	bookingSource?: string;
 }
 
 export default function GroupBookingsPage() {
@@ -68,10 +68,11 @@ export default function GroupBookingsPage() {
 			if (!response.ok) throw new Error("Failed to fetch group bookings");
 			
 			const data = await response.json();
-			// Mark corporate bookings
-			const bookingsWithCorporateFlag = (data.groupBookings || []).map((booking: GroupBooking) => ({
+			// Mark corporate bookings by checking if any occupancy has corporateBookingId
+			const bookingsWithCorporateFlag = (data.groupBookings || []).map((booking: any) => ({
 				...booking,
-				isCorporate: booking.groupName.includes("(Corporate)"),
+				isCorporate: booking.rooms?.some((room: any) => room.corporateBookingId) || 
+							 booking.groupName.includes("(Corporate)"),
 			}));
 			setGroupBookings(bookingsWithCorporateFlag);
 		} catch (error) {
@@ -404,7 +405,7 @@ export default function GroupBookingsPage() {
 													{booking.status}
 												</span>
 											</div>
-											<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+											<div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
 												<div>
 													<p className="text-xs text-muted-foreground">Total Rooms</p>
 													<p className="font-semibold">{booking.totalRooms}</p>
@@ -414,16 +415,19 @@ export default function GroupBookingsPage() {
 													<p className="font-semibold text-green-600">{booking.roomsBooked}</p>
 												</div>
 												<div>
-													<p className="text-xs text-muted-foreground">Pending</p>
-													<p className="font-semibold text-orange-600">{booking.roomsPending}</p>
-												</div>
-												<div>
 													<p className="text-xs text-muted-foreground">Check-in / Check-out</p>
 													<p className="font-semibold text-sm">
 														{new Date(booking.checkInDate).toLocaleDateString()} - {new Date(booking.checkOutDate).toLocaleDateString()}
 													</p>
 												</div>
 											</div>
+											{booking.bookingSource && (
+												<div className="mt-3 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+													<p className="text-xs text-blue-600 dark:text-blue-400">
+														Booking Source: {booking.bookingSource.replace(/_/g, ' ')}
+													</p>
+												</div>
+											)}
 											<div className="mt-4 pt-4 border-t dark:border-gray-700">
 												<p className="text-sm">
 													<span className="text-muted-foreground">Contact:</span> {booking.contactName} • {booking.contactPhone}

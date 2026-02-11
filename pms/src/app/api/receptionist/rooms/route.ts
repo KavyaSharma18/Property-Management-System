@@ -171,6 +171,7 @@ export async function GET(req: NextRequest) {
               balanceAmount: recalculatedBalance,
               guestCount: guests.length,
               guests: guests,
+              bookingSource: currentOccupancy.bookingSource,
             }
           : null,
       };

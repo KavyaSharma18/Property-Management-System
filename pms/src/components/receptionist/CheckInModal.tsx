@@ -35,6 +35,7 @@ interface CheckInData {
 	idProofNumber: string;
 	pricePerNight: number;
 	advancePayment?: number;
+	bookingPlatform?: string;
 	corporateBooking?: CorporateBookingData;
 }
 
@@ -57,6 +58,7 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 		idProofNumber: "",
 		pricePerNight: room?.pricePerNight || 0,
 		advancePayment: undefined,
+		bookingPlatform: "WALK_IN",
 	});
 
 	const [errors, setErrors] = useState<Partial<Record<keyof CheckInData, string>>>({});
@@ -77,6 +79,7 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 				idProofNumber: "",
 				pricePerNight: room.pricePerNight || 0,
 				advancePayment: undefined,
+				bookingPlatform: "WALK_IN",
 			});
 			setErrors({});
 			setCorporateData(null);
@@ -96,9 +99,10 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 			setErrors(prev => ({ ...prev, [field]: "" }));
 		}
 		
-		// Open corporate booking modal when corporate payment is selected
+		// Open corporate booking modal and set booking source when corporate payment is selected
 		if (field === "paymentMethod" && value === "CORPORATE") {
 			setShowCorporateModal(true);
+			setFormData(prev => ({ ...prev, bookingPlatform: "CORPORATE" }));
 		}
 	};
 
@@ -176,6 +180,7 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 				idProofNumber: "",
 				pricePerNight: room?.pricePerNight || 0,
 				advancePayment: undefined,
+				bookingPlatform: "WALK_IN",
 			});
 			setErrors({});
 			setCorporateData(null);
@@ -196,6 +201,7 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 			idProofNumber: "",
 			pricePerNight: room?.pricePerNight || 0,
 			advancePayment: undefined,
+			bookingPlatform: "WALK_IN",
 		});
 		setErrors({});
 		setCorporateData(null);
@@ -328,7 +334,7 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 								</div>
 							</div>
 
-							<div className="grid grid-cols-1 gap-4">
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 								<div>
 									<Label htmlFor="paymentMethod">Payment Method *</Label>
 									<select
@@ -356,6 +362,29 @@ const CheckInModal: React.FC<CheckInModalProps> = ({ open, room, onClose, onConf
 										</button>
 									</div>
 								)}								</div>
+								
+								<div>
+									<Label htmlFor="bookingPlatform">Booking Source *</Label>
+									<select
+										id="bookingPlatform"
+										value={formData.bookingPlatform}
+										onChange={(e) => handleInputChange("bookingPlatform", e.target.value)}
+										className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+									>
+										<option value="WALK_IN">Walk-In</option>
+										<option value="PHONE_CALL">Phone Call</option>
+										<option value="MAKEMYTRIP">MakeMyTrip</option>
+										<option value="GOIBIBO">Goibibo</option>
+										<option value="BOOKING_DOT_COM">Booking.com</option>
+										<option value="AIRBNB">Airbnb</option>
+										<option value="AGODA">Agoda</option>
+										<option value="EXPEDIA">Expedia</option>
+										<option value="CORPORATE">Corporate</option>
+										<option value="TRAVEL_AGENT">Travel Agent</option>
+										<option value="WEBSITE">Property Website</option>
+										<option value="OTHER">Other</option>
+									</select>
+								</div>
 							</div>
 						</div>
 

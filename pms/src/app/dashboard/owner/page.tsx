@@ -1,6 +1,8 @@
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+"use client";
+
+import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import DashboardHeader from "@/components/dashboard/header";
 import Sidebar from "@/components/dashboard/sidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,23 +15,19 @@ import {
   AlertCircle,
   DoorOpen,
   IndianRupee,
-  Calendar
+  Calendar,
+  Loader2
 } from "lucide-react";
-import prisma from "@/lib/prisma";
 
-export default async function OwnerDashboard() {
-  const session = await getServerSession(authOptions);
-
-  if (!session) redirect("/auth/signin");
-
-  if ((session.user as any).role !== "OWNER") {
-    redirect("/dashboard/receptionist");
-  }
-
-  const userId = (session.user as any)?.id;
-
-  // Fetch dashboard data directly from database
-  let overview = {
+export default function OwnerDashboard() {
+  const { data: session } = useSession();
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
+  const [revenueFilter, setRevenueFilter] = useState<"all" | "thisWeek" | "thisMonth" | "thisYear" | "avgMonthly" | "custom">("all");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  
+  const [overview, setOverview] = useState({
     totalProperties: 0,
     totalRooms: 0,
     occupiedRooms: 0,
@@ -41,239 +39,127 @@ export default async function OwnerDashboard() {
     overallOccupancyRate: 0,
     activeOccupancies: 0,
     propertiesWithoutReceptionist: 0,
-  };
+  });
 
-  let revenue = {
+  const [revenue, setRevenue] = useState({
     total: 0,
     thisMonth: 0,
     today: 0,
     pendingAmount: 0,
     pendingCount: 0,
-  };
+  });
 
-  let activity = {
+  const [activity, setActivity] = useState({
     recentCheckIns: 0,
     upcomingCheckouts: 0,
+  });
+
+  const [properties, setProperties] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!session) {
+      router.push("/auth/signin");
+      return;
+    }
+
+    if ((session.user as any).role !== "OWNER") {
+      router.push("/dashboard/receptionist");
+      return;
+    }
+
+    const fetchDashboardData = async () => {
+      try {
+        setIsLoading(true);
+        const res = await fetch("/api/owner/dashboard");
+        if (res.ok) {
+          const data = await res.json();
+          setOverview(data.overview || overview);
+          setRevenue(data.revenue || revenue);
+          setActivity(data.activity || activity);
+          setProperties(data.properties || []);
+        }
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [session, router]);
+
+  // Calculate filtered revenue
+  const getFilteredRevenue = () => {
+    const totalRevenue = revenue.total;
+    const now = new Date();
+    
+    switch (revenueFilter) {
+      case "thisWeek": {
+        const estimatedDaily = totalRevenue / 365;
+        return estimatedDaily * 7;
+      }
+      case "thisMonth": {
+        const monthsElapsed = now.getMonth() + 1;
+        return totalRevenue / Math.max(monthsElapsed, 1);
+      }
+      case "thisYear": {
+        return totalRevenue;
+      }
+      case "avgMonthly": {
+        const monthsElapsed = now.getMonth() + 1;
+        return totalRevenue / Math.max(monthsElapsed, 1);
+      }
+      case "custom": {
+        if (customStartDate && customEndDate) {
+          const start = new Date(customStartDate);
+          const end = new Date(customEndDate);
+          const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+          return (totalRevenue / 365) * Math.max(daysDiff, 0);
+        }
+        return totalRevenue;
+      }
+      case "all":
+      default:
+        return totalRevenue;
+    }
   };
 
-  let properties: any[] = [];
+  const displayRevenue = getFilteredRevenue();
+  const revenueLabel = revenueFilter === "all" ? "Total Revenue" : 
+                       revenueFilter === "thisWeek" ? "This Week (Est.)" :
+                       revenueFilter === "thisMonth" ? "This Month (Est.)" :
+                       revenueFilter === "thisYear" ? "This Year" :
+                       revenueFilter === "avgMonthly" ? "Avg Monthly" :
+                       "Custom Period";
 
-  try {
-    // Get all properties owned by this user
-    const propertiesData = await prisma.properties.findMany({
-      where: { ownerId: userId },
-      include: {
-        rooms: {
-          include: {
-            occupancies: {
-              where: {
-                actualCheckOut: null,
-              },
-            },
-          },
-        },
-        users_properties_receptionistIdTousers: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-      },
-    });
-
-    // Calculate totals
-    const totalProperties = propertiesData.length;
-    const totalRooms = propertiesData.reduce((sum, p) => sum + p.rooms.length, 0);
-
-    // Room status distribution
-    const roomStatusCounts = propertiesData.reduce(
-      (acc, property) => {
-        property.rooms.forEach((room) => {
-          acc[room.status] = (acc[room.status] || 0) + 1;
-        });
-        return acc;
-      },
-      {} as Record<string, number>
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <DashboardHeader
+          userName={session?.user?.name}
+          userEmail={session?.user?.email}
+          userRole="OWNER"
+        />
+        <div className="flex">
+          <Sidebar role="owner" />
+          <main className="flex-1 p-8">
+            <div className="flex items-center justify-center min-h-[400px]">
+              <div className="text-center">
+                <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-primary" />
+                <p className="text-muted-foreground">Loading dashboard...</p>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
     );
-
-    const occupiedRooms = roomStatusCounts["OCCUPIED"] || 0;
-    const vacantRooms = roomStatusCounts["VACANT"] || 0;
-    const maintenanceRooms = roomStatusCounts["MAINTENANCE"] || 0;
-    const dirtyRooms = roomStatusCounts["DIRTY"] || 0;
-    const cleaningRooms = roomStatusCounts["CLEANING"] || 0;
-    const reservedRooms = roomStatusCounts["RESERVED"] || 0;
-
-    const occupancyRate =
-      totalRooms > 0 ? Math.round((occupiedRooms / totalRooms) * 100) : 0;
-
-    // Get all payments for revenue calculation
-    const allPayments = await prisma.payments.findMany({
-      where: {
-        occupancies: {
-          rooms: {
-            propertyId: {
-              in: propertiesData.map((p) => p.id),
-            },
-          },
-        },
-      },
-      select: {
-        amount: true,
-        paymentDate: true,
-      },
-    });
-
-    const totalRevenue = allPayments.reduce((sum, p) => sum + p.amount, 0);
-
-    // This month's revenue
-    const now = new Date();
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const thisMonthRevenue = allPayments
-      .filter((p) => p.paymentDate >= firstDayOfMonth)
-      .reduce((sum, p) => sum + p.amount, 0);
-
-    // Today's revenue
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayRevenue = allPayments
-      .filter((p) => {
-        const paymentDate = new Date(p.paymentDate);
-        paymentDate.setHours(0, 0, 0, 0);
-        return paymentDate.getTime() === today.getTime();
-      })
-      .reduce((sum, p) => sum + p.amount, 0);
-
-    // Active occupancies count
-    const activeOccupancies = propertiesData.reduce(
-      (sum, p) => sum + p.rooms.reduce((count, r) => count + r.occupancies.length, 0),
-      0
-    );
-
-    // Properties without receptionist
-    const propertiesWithoutReceptionist = propertiesData.filter(
-      (p) => !p.users_properties_receptionistIdTousers
-    ).length;
-
-    // Get pending payments
-    const pendingPayments = await prisma.occupancies.findMany({
-      where: {
-        rooms: {
-          propertyId: {
-            in: propertiesData.map((p) => p.id),
-          },
-        },
-        actualCheckOut: null,
-        balanceAmount: {
-          gt: 0,
-        },
-      },
-      select: {
-        balanceAmount: true,
-      },
-    });
-
-    const totalPendingAmount = pendingPayments.reduce(
-      (sum, occ) => sum + (occ.balanceAmount || 0),
-      0
-    );
-
-    // Recent check-ins (last 7 days)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-    const recentCheckIns = await prisma.occupancies.count({
-      where: {
-        rooms: {
-          propertyId: {
-            in: propertiesData.map((p) => p.id),
-          },
-        },
-        checkInTime: {
-          gte: sevenDaysAgo,
-        },
-      },
-    });
-
-    // Upcoming checkouts (next 3 days)
-    const threeDaysFromNow = new Date();
-    threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
-
-    const upcomingCheckouts = await prisma.occupancies.count({
-      where: {
-        rooms: {
-          propertyId: {
-            in: propertiesData.map((p) => p.id),
-          },
-        },
-        actualCheckOut: null,
-        expectedCheckOut: {
-          lte: threeDaysFromNow,
-          gte: new Date(),
-        },
-      },
-    });
-
-    // Property-wise summary
-    const propertySummary = propertiesData.map((property) => {
-      const rooms = property.rooms;
-      const occupied = rooms.filter((r) => r.status === "OCCUPIED").length;
-      const vacant = rooms.filter((r) => r.status === "VACANT").length;
-      const propOccupancyRate =
-        rooms.length > 0 ? Math.round((occupied / rooms.length) * 100) : 0;
-
-      return {
-        id: property.id,
-        name: property.name,
-        address: property.address,
-        city: property.city,
-        state: property.state,
-        totalRooms: rooms.length,
-        occupiedRooms: occupied,
-        vacantRooms: vacant,
-        occupancyRate: propOccupancyRate,
-        receptionist: property.users_properties_receptionistIdTousers,
-        status: property.status,
-      };
-    });
-
-    overview = {
-      totalProperties,
-      totalRooms,
-      occupiedRooms,
-      vacantRooms,
-      maintenanceRooms,
-      dirtyRooms,
-      cleaningRooms,
-      reservedRooms,
-      overallOccupancyRate: occupancyRate,
-      activeOccupancies,
-      propertiesWithoutReceptionist,
-    };
-
-    revenue = {
-      total: totalRevenue,
-      thisMonth: thisMonthRevenue,
-      today: todayRevenue,
-      pendingAmount: totalPendingAmount,
-      pendingCount: pendingPayments.length,
-    };
-
-    activity = {
-      recentCheckIns,
-      upcomingCheckouts,
-    };
-
-    properties = propertySummary;
-  } catch (error) {
-    console.error('Failed to fetch dashboard data:', error);
   }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <DashboardHeader
-        userName={session.user?.name}
-        userEmail={session.user?.email}
+        userName={session?.user?.name || ""}
+        userEmail={session?.user?.email || ""}
         userRole="OWNER"
       />
 
@@ -306,17 +192,46 @@ export default async function OwnerDashboard() {
 
           {/* KPI Cards */}
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {/* Total Revenue */}
+            {/* Total Revenue with Filter */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+                <CardTitle className="text-sm font-medium">{revenueLabel}</CardTitle>
                 <IndianRupee className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">₹{revenue.total.toLocaleString('en-IN')}</div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  This month: ₹{revenue.thisMonth.toLocaleString('en-IN')}
-                </p>
+                <div className="text-2xl font-bold">₹{Math.round(displayRevenue).toLocaleString('en-IN')}</div>
+                <div className="mt-3">
+                  <select
+                    value={revenueFilter}
+                    onChange={(e) => setRevenueFilter(e.target.value as any)}
+                    className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">All Time</option>
+                    <option value="thisWeek">This Week</option>
+                    <option value="thisMonth">This Month</option>
+                    <option value="thisYear">This Year</option>
+                    <option value="avgMonthly">Average Monthly</option>
+                    <option value="custom">Custom Dates</option>
+                  </select>
+                </div>
+                {revenueFilter === "custom" && (
+                  <div className="mt-2 space-y-1">
+                    <input
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      placeholder="Start Date"
+                      className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100"
+                    />
+                    <input
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      placeholder="End Date"
+                      className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100"
+                    />
+                  </div>
+                )}
               </CardContent>
             </Card>
 

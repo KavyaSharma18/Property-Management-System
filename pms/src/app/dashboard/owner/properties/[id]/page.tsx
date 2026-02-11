@@ -81,6 +81,9 @@ export default function PropertyDetail({ params }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [revenueFilter, setRevenueFilter] = useState<"all" | "thisWeek" | "thisMonth" | "thisYear" | "avgMonthly" | "custom">("all");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
 
   // Fetch property data from API
   useEffect(() => {
@@ -270,6 +273,55 @@ export default function PropertyDetail({ params }: Props) {
     unreadAlerts: 0,
   };
 
+  // Calculate filtered revenue
+  const getFilteredRevenue = () => {
+    const totalRevenue = analytics.totalRevenue;
+    const now = new Date();
+    
+    switch (revenueFilter) {
+      case "thisWeek": {
+        // Estimate weekly revenue based on daily average
+        const estimatedDaily = totalRevenue / 365;
+        return estimatedDaily * 7;
+      }
+      case "thisMonth": {
+        // Estimate monthly revenue
+        const monthsElapsed = now.getMonth() + 1;
+        return totalRevenue / Math.max(monthsElapsed, 1);
+      }
+      case "thisYear": {
+        // Current year revenue
+        return totalRevenue;
+      }
+      case "avgMonthly": {
+        // Average monthly revenue
+        const monthsElapsed = now.getMonth() + 1;
+        return totalRevenue / Math.max(monthsElapsed, 1);
+      }
+      case "custom": {
+        if (customStartDate && customEndDate) {
+          const start = new Date(customStartDate);
+          const end = new Date(customEndDate);
+          const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+          // Estimate based on daily average
+          return (totalRevenue / 365) * Math.max(daysDiff, 0);
+        }
+        return totalRevenue;
+      }
+      case "all":
+      default:
+        return totalRevenue;
+    }
+  };
+
+  const displayRevenue = getFilteredRevenue();
+  const revenueLabel = revenueFilter === "all" ? "Total Revenue" : 
+                       revenueFilter === "thisWeek" ? "This Week (Est.)" :
+                       revenueFilter === "thisMonth" ? "This Month (Est.)" :
+                       revenueFilter === "thisYear" ? "This Year" :
+                       revenueFilter === "avgMonthly" ? "Avg Monthly" :
+                       "Custom Period";
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <DashboardHeader
@@ -334,7 +386,47 @@ export default function PropertyDetail({ params }: Props) {
 
           {/* Property Metrics */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <MetricCard label="Total Revenue" value={`₹${analytics.totalRevenue.toLocaleString("en-IN")}`} />
+            {/* Revenue Card with Filter */}
+            <Card className="md:col-span-2 lg:col-span-1">
+              <CardContent>
+                <div className="mb-2">
+                  <p className="text-sm text-muted-foreground">{revenueLabel}</p>
+                  <p className="text-2xl font-bold">₹{Math.round(displayRevenue).toLocaleString("en-IN")}</p>
+                </div>
+                <div className="mt-3">
+                  <select
+                    value={revenueFilter}
+                    onChange={(e) => setRevenueFilter(e.target.value as any)}
+                    className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">All Time</option>
+                    <option value="thisWeek">This Week</option>
+                    <option value="thisMonth">This Month</option>
+                    <option value="thisYear">This Year</option>
+                    <option value="avgMonthly">Average Monthly</option>
+                    <option value="custom">Custom Dates</option>
+                  </select>
+                </div>
+                {revenueFilter === "custom" && (
+                  <div className="mt-2 space-y-1">
+                    <input
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      placeholder="Start Date"
+                      className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100"
+                    />
+                    <input
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      placeholder="End Date"
+                      className="w-full px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100"
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
             <MetricCard label="Total Occupants" value={analytics.totalOccupants} />
             <MetricCard label="Occupancy Rate" value={`${Math.round(analytics.occupancyRate)}%`} />
             <MetricCard 
@@ -428,8 +520,8 @@ export default function PropertyDetail({ params }: Props) {
                       ...property, 
                       floors, 
                       numberOfFloors: floors.length,
-                      amenities: property.amenities?.join(",") || "",
-                      images: property.images?.join(",") || "",
+                      amenities: Array.isArray(property.amenities) ? property.amenities.join(",") : (property.amenities || ""),
+                      images: Array.isArray(property.images) ? property.images.join(",") : (property.images || ""),
                     });
                     setIsEditOpen(true);
                   }}

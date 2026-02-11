@@ -539,6 +539,7 @@ interface Room {
 	guestEmail?: string;
 	guestPhone?: string;
 	paymentMethod?: string;
+	bookingSource?: string;
 }
 
 export default function RoomsPage() {
@@ -568,41 +569,40 @@ export default function RoomsPage() {
 				
 				const data = await response.json();
 				
-				// Transform API data to match Room interface
-				const transformedRooms: Room[] = data.rooms.map((room: any) => {
-					const occupancy = room.currentOccupancy;
-					const primaryGuest = occupancy?.guests?.[0];
-					
-					// Normalize status to match expected values
-					let normalizedStatus: "occupied" | "vacant" | "maintenance" | "dirty" | "cleaning" = "vacant";
-					if (room.status === "OCCUPIED") normalizedStatus = "occupied";
-					else if (room.status === "MAINTENANCE") normalizedStatus = "maintenance";
-					else if (room.status === "DIRTY") normalizedStatus = "dirty";
-					else if (room.status === "CLEANING") normalizedStatus = "cleaning";
-					else normalizedStatus = "vacant";
-					
-					return {
-						id: room.id,
-						number: room.roomNumber,
-						type: room.type,
-						status: normalizedStatus,
-						capacity: room.capacity,
-						pricePerNight: room.pricePerNight,
-						guests: occupancy?.guestCount || 0,
-						floorNumber: room.floor?.floorNumber || 0,
-						paidAmount: occupancy?.paidAmount || 0,
-						bookingId: occupancy?.id ? `BK-${occupancy.id}` : undefined,
-						occupancyId: occupancy?.id,
-						checkInAt: occupancy?.checkInTime,
-						expectedCheckOutDate: occupancy?.expectedCheckOut,
-						guestName: primaryGuest?.name,
-						guestEmail: primaryGuest?.email,
-						guestPhone: primaryGuest?.phone,
-						isGroupBooking: !!occupancy?.groupBookingId,
-					};
-				});
+			// Transform API data to match Room interface
+			const transformedRooms: Room[] = data.rooms.map((room: any) => {
+				const occupancy = room.currentOccupancy;
+				const primaryGuest = occupancy?.guests?.[0];
 				
-				setRooms(transformedRooms);
+				// Normalize status to match expected values
+				let normalizedStatus: "occupied" | "vacant" | "maintenance" | "dirty" | "cleaning" = "vacant";
+				if (room.status === "OCCUPIED") normalizedStatus = "occupied";
+				else if (room.status === "MAINTENANCE") normalizedStatus = "maintenance";
+				else if (room.status === "DIRTY") normalizedStatus = "dirty";
+				else if (room.status === "CLEANING") normalizedStatus = "cleaning";
+				else normalizedStatus = "vacant";
+				
+				return {
+					id: room.id,
+					number: room.roomNumber,
+					type: room.type,
+					status: normalizedStatus,
+					capacity: room.capacity,
+					pricePerNight: room.pricePerNight,
+					guests: occupancy?.guestCount || 0,
+					floorNumber: room.floor?.floorNumber || 0,
+					paidAmount: occupancy?.paidAmount || 0,
+					bookingId: occupancy?.id ? `BK-${occupancy.id}` : undefined,
+					occupancyId: occupancy?.id,
+					checkInAt: occupancy?.checkInTime,
+					expectedCheckOutDate: occupancy?.expectedCheckOut,
+					guestName: primaryGuest?.name,
+					guestEmail: primaryGuest?.email,
+					guestPhone: primaryGuest?.phone,
+					isGroupBooking: !!occupancy?.groupBookingId,
+					bookingSource: occupancy?.bookingSource,
+				};
+			});				setRooms(transformedRooms);
 			} catch (error) {
 				console.error("Error fetching rooms:", error);
 			} finally {
@@ -708,12 +708,13 @@ export default function RoomsPage() {
 							guestName: primaryGuest?.name,
 							guestEmail: primaryGuest?.email,
 							guestPhone: primaryGuest?.phone,
-						isGroupBooking: !!occupancy?.groupBookingId,
-					};
-				});
-				setRooms(transformedRooms);
-			}
-			setIsLoading(false);
+							isGroupBooking: !!occupancy?.groupBookingId,
+							bookingSource: occupancy?.bookingSource,
+						};
+					});
+					setRooms(transformedRooms);
+				}
+				setIsLoading(false);
 				
 				alert(
 					`Checkout successful!\n\n` +
@@ -756,6 +757,7 @@ export default function RoomsPage() {
 					amount: checkInData.advancePayment,
 					paymentMethod: checkInData.paymentMethod,
 				} : undefined,
+				bookingSource: checkInData.bookingPlatform || "WALK_IN",
 			};
 
 			const response = await fetch("/api/receptionist/check-in", {
@@ -799,6 +801,7 @@ export default function RoomsPage() {
 						guestEmail: primaryGuest?.email,
 						guestPhone: primaryGuest?.phone,
 						isGroupBooking: !!occupancy?.groupBookingId,
+						bookingSource: occupancy?.bookingSource,
 					};
 				});
 				setRooms(transformedRooms);

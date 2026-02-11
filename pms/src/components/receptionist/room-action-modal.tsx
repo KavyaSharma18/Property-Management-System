@@ -22,6 +22,7 @@ export interface RoomActionModalRoom {
   checkInAt?: string;
   checkOutAt?: string;
   expectedCheckOutDate?: string;
+  bookingSource?: string;
 }
 
 interface PaymentSummary {
@@ -152,10 +153,24 @@ export default function RoomActionModal({
 
           {room.status === "occupied" && room.bookingId && (
             <div className="rounded-lg border dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
-              <p className="text-sm text-muted-foreground">Booking ID</p>
-              <p className="font-semibold">{room.bookingId}</p>
-              <div className="mt-2 text-sm text-muted-foreground">
-                ID Proof: {room.idProofType || "N/A"} {room.idProofNumber ? `• ${room.idProofNumber}` : ""}
+              <p className="text-sm font-semibold mb-3">Booking Information</p>
+              <div className="space-y-2">
+                <div>
+                  <span className="text-sm text-muted-foreground">Booking ID:</span>{" "}
+                  <span className="font-medium">{room.bookingId}</span>
+                </div>
+                <div>
+                  <span className="text-sm text-muted-foreground">ID Proof:</span>{" "}
+                  <span className="font-medium">{room.idProofType || "N/A"} {room.idProofNumber ? `• ${room.idProofNumber}` : ""}</span>
+                </div>
+                {room.bookingSource && (
+                  <div>
+                    <span className="text-sm text-muted-foreground">Booking Source:</span>{" "}
+                    <span className="font-medium text-blue-600 dark:text-blue-400">
+                      {room.bookingSource.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           )}

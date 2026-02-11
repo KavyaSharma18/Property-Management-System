@@ -197,12 +197,9 @@ export default function PaymentsPage() {
 					{/* Stats Cards */}
 					<div className="mb-6">
 						<Card className="p-4 max-w-sm bg-white dark:bg-gray-800">
-							<div className="flex items-center justify-between">
-								<div>
-									<p className="text-sm text-muted-foreground">Pending Payments</p>
-									<p className="text-3xl font-bold mt-1 text-red-600">₹{totalStats.pending.toLocaleString("en-IN")}</p>
-								</div>
-								<IndianRupee className="text-red-500" size={36} />
+							<div>
+								<p className="text-sm text-muted-foreground">Pending Payments</p>
+								<p className="text-3xl font-bold mt-1 text-red-600">₹{totalStats.pending.toLocaleString("en-IN")}</p>
 							</div>
 						</Card>
 					</div>

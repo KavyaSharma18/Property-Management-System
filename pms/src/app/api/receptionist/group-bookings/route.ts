@@ -182,6 +182,7 @@ export async function GET(req: NextRequest) {
         totalAmount: occ.totalAmount,
         paidAmount: occ.paidAmount,
         balanceAmount: occ.balanceAmount,
+        corporateBookingId: occ.corporateBookingId,
       }));
 
       return {

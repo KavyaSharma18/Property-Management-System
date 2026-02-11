@@ -28,6 +28,7 @@ interface GroupBookingCheckInData {
 	pricePerNight: number;
 	advancePayment?: number;
 	selectedRoomIds: number[];
+	bookingPlatform?: string;
 }
 
 interface GroupBookingCheckInModalProps {
@@ -55,6 +56,7 @@ const GroupBookingCheckInModal: React.FC<GroupBookingCheckInModalProps> = ({
 		pricePerNight: 0,
 		advancePayment: undefined,
 		selectedRoomIds: [],
+		bookingPlatform: "WALK_IN",
 	});
 
 	const [errors, setErrors] = useState<Partial<Record<keyof GroupBookingCheckInData, string>>>({});
@@ -414,7 +416,7 @@ const GroupBookingCheckInModal: React.FC<GroupBookingCheckInModalProps> = ({
 								</div>
 							</div>
 
-							<div className="grid grid-cols-1 gap-4">
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 								<div>
 									<Label htmlFor="paymentMethod">Payment Method *</Label>
 									<select
@@ -428,6 +430,28 @@ const GroupBookingCheckInModal: React.FC<GroupBookingCheckInModalProps> = ({
 										<option value="UPI">UPI</option>
 										<option value="BANK_TRANSFER">Bank Transfer</option>
 										<option value="CHEQUE">Cheque</option>
+									</select>
+								</div>
+								
+								<div>
+									<Label htmlFor="bookingPlatform">Booking Source *</Label>
+									<select
+										id="bookingPlatform"
+										value={formData.bookingPlatform}
+										onChange={(e) => handleInputChange("bookingPlatform", e.target.value)}
+										className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+									>
+										<option value="WALK_IN">Walk-In</option>
+										<option value="PHONE_CALL">Phone Call</option>
+										<option value="MAKEMYTRIP">MakeMyTrip</option>
+										<option value="GOIBIBO">Goibibo</option>
+										<option value="BOOKING_DOT_COM">Booking.com</option>
+										<option value="AIRBNB">Airbnb</option>
+										<option value="AGODA">Agoda</option>
+										<option value="EXPEDIA">Expedia</option>
+										<option value="TRAVEL_AGENT">Travel Agent</option>
+										<option value="WEBSITE">Property Website</option>
+										<option value="OTHER">Other</option>
 									</select>
 								</div>
 							</div>
